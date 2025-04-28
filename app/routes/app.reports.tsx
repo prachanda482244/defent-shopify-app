@@ -1,4 +1,5 @@
 import debounce from "lodash.debounce";
+import { HideIcon, ViewIcon } from "@shopify/polaris-icons";
 import {
   Card,
   DataTable,
@@ -10,6 +11,7 @@ import {
   SkeletonBodyText,
   Button,
   TextField,
+  Icon,
 } from "@shopify/polaris";
 import { useCallback, useEffect, useState } from "react";
 import apiClient from "app/config/AxiosInstance";
@@ -23,6 +25,7 @@ interface ReportProps {
   isQualify: string;
   medication: string;
   state: string;
+  image: string;
 }
 
 interface ApiResponse {
@@ -69,6 +72,10 @@ export default function ReportsTable() {
 
   const handleQualifyChange = async (id: string, newValue: string) => {
     if (newValue === "delete") {
+      const confirmDelete = confirm(
+        "Are you sure you want to delete this entry ?",
+      );
+      if (!confirmDelete) return;
       try {
         const { data } = await apiClient.delete(`/admin/reports/${id}`);
         if (data?.statusCode === 200) {
@@ -119,9 +126,14 @@ export default function ReportsTable() {
         selectedReport?._id === report._id ? "bg-gray-100" : ""
       }`}
     >
-      <Text as="span" fontWeight="bold">
-        {report.medication}
-      </Text>
+      <p className="flex items-center gap-2 ">
+        <span className="">
+          <Icon
+            source={selectedReport?._id === report._id ? ViewIcon : HideIcon}
+          />
+        </span>
+        <span className="font-bold w-full">{report.medication}</span>
+      </p>
     </div>,
     report.age,
     report.state,
@@ -134,7 +146,9 @@ export default function ReportsTable() {
           ? `success`
           : report?.isQualify === "rejected"
             ? "critical"
-            : "warning"
+            : report?.isQualify == "new"
+              ? "info-strong"
+              : "warning"
       }
     >
       {report.isQualify}
@@ -170,7 +184,7 @@ export default function ReportsTable() {
           <TextField
             clearButton
             label=""
-            placeholder="Search medication..."
+            placeholder="Search here..."
             value={searchQuery}
             onChange={(value) => handleSearchChange(value)}
             autoComplete="off"
@@ -185,7 +199,7 @@ export default function ReportsTable() {
       <div className="flex gap-4">
         <div
           className={`transition-all ${
-            selectedReport ? "w-2/3" : "w-full"
+            selectedReport ? "w-[30%]" : "w-full"
           } duration-300`}
         >
           <Card>
@@ -231,37 +245,71 @@ export default function ReportsTable() {
         </div>
 
         {selectedReport && (
-          <div className="w-1/2 bg-white border rounded-md p-4 shadow-md">
-            <div className="flex justify-between items-center mb-4">
-              <Text as="p" variant="headingMd">
+          <div className="w-[70%] bg-white border rounded-lg p-6 shadow-lg space-y-6">
+            <div className="flex justify-between items-center">
+              <Text as="h2" variant="headingMd">
                 Report Details
               </Text>
-              <Button onClick={() => setSelectedReport(null)} size="slim">
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button tone="critical" size="slim" onClick={() => {}}>
+                  Delete
+                </Button>
+                <Button size="slim" onClick={() => setSelectedReport(null)}>
+                  Close
+                </Button>
+              </div>
             </div>
-            <div className="space-y-2">
+
+            <div className="w-full flex justify-center">
+              <img
+                src={
+                  selectedReport?.image ||
+                  "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                }
+                alt="Report"
+                className="max-w-[300px] max-h-[300px] object-cover rounded-md shadow"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <p>
-                <strong>Medication:</strong> {selectedReport.medication}
+                <span className="font-semibold">Medication:</span>{" "}
+                {selectedReport.medication}
               </p>
               <p>
-                <strong>Age:</strong> {selectedReport.age}
+                <span className="font-semibold">Age:</span> {selectedReport.age}
               </p>
               <p>
-                <strong>State:</strong> {selectedReport.state}
+                <span className="font-semibold">State:</span>{" "}
+                {selectedReport.state}
               </p>
               <p>
-                <strong>City:</strong> {selectedReport.city}
+                <span className="font-semibold">City:</span>{" "}
+                {selectedReport.city}
               </p>
               <p>
-                <strong>IP Address:</strong> {selectedReport.ipAddress}
+                <span className="font-semibold">IP Address:</span>{" "}
+                {selectedReport.ipAddress}
               </p>
               <p>
-                <strong>Submitted On:</strong>{" "}
+                <span className="font-semibold">Submitted On:</span>{" "}
                 {new Date(selectedReport.createdAt).toLocaleDateString()}
               </p>
               <p>
-                <strong>Status:</strong> {selectedReport.isQualify}
+                <span className="font-semibold">Status:</span>{" "}
+                <Badge
+                  tone={
+                    selectedReport?.isQualify === "approved"
+                      ? `success`
+                      : selectedReport?.isQualify === "rejected"
+                        ? "critical"
+                        : selectedReport?.isQualify == "new"
+                          ? "info-strong"
+                          : "warning"
+                  }
+                >
+                  {selectedReport.isQualify}
+                </Badge>
               </p>
             </div>
           </div>
