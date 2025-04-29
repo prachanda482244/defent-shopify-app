@@ -3,7 +3,7 @@
 client_id = "df9110b7614a935e763101fea3f1e4f2"
 name = "defent-app"
 handle = "defent-app"
-application_url = "https://mime-vol-budget-ye.trycloudflare.com"
+application_url = "https://commissions-crafts-fed-testing.trycloudflare.com"
 embedded = true
 
 [build]
@@ -27,9 +27,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://mime-vol-budget-ye.trycloudflare.com/auth/callback",
-  "https://mime-vol-budget-ye.trycloudflare.com/auth/shopify/callback",
-  "https://mime-vol-budget-ye.trycloudflare.com/api/auth/callback"
+  "https://commissions-crafts-fed-testing.trycloudflare.com/auth/callback",
+  "https://commissions-crafts-fed-testing.trycloudflare.com/auth/shopify/callback",
+  "https://commissions-crafts-fed-testing.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
