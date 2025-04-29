@@ -12,11 +12,13 @@ import {
   useBreakpoints,
   Select,
   ChoiceList,
+  Button,
 } from "@shopify/polaris";
 import type { IndexFiltersProps, TabProps } from "@shopify/polaris";
 import apiClient from "app/config/AxiosInstance";
 import { useState, useCallback, useEffect } from "react";
 import debounce from "lodash.debounce";
+import { Modal } from "@shopify/app-bridge-react";
 function disambiguateLabel(key: string, value: string | any[]): string {
   switch (key) {
     case "ageGroup":
@@ -96,7 +98,7 @@ const Testing = () => {
     try {
       setLoading(true);
       const { data } = await apiClient.get<ApiResponse>(
-        `/admin/reports?page=${currentPage}&&filter=${activeButton}&&q=${query}&state=${state}&medication=${medication}&age=${ageGroup}&status=${filterStatus}`,
+        `/admin/reports?page=${currentPage}&filter=${activeButton}&q=${query}&state=${state}&medication=${medication}&age=${ageGroup}&status=${filterStatus}`,
       );
       if (data?.statusCode === 200) {
         setReports(data?.data.reports);
@@ -319,7 +321,17 @@ const Testing = () => {
 
   const rowMarkup = reports.map(
     (
-      { _id, age, ipAddress, city, createdAt, isQualify, medication, state },
+      {
+        _id,
+        age,
+        ipAddress,
+        city,
+        createdAt,
+        image,
+        isQualify,
+        medication,
+        state,
+      },
       index,
     ) => (
       <IndexTable.Row
@@ -364,6 +376,27 @@ const Testing = () => {
             options={actionOptions}
             onChange={(newValue) => handleQualifyChange(_id, newValue)}
           />
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          {" "}
+          <Button
+            onClick={() => {
+              setSelectedReport({
+                _id,
+                age,
+                city,
+                createdAt,
+                image,
+                ipAddress,
+                isQualify,
+                medication,
+                state,
+              });
+              shopify.modal.show("display-modal");
+            }}
+          >
+            View
+          </Button>
         </IndexTable.Cell>
       </IndexTable.Row>
     ),
@@ -431,6 +464,7 @@ const Testing = () => {
               { title: "Submitted On" },
               { title: "Status" },
               { title: "Action" },
+              { title: "View" },
             ]}
             bulkActions={bulkActions}
             pagination={{
@@ -442,6 +476,80 @@ const Testing = () => {
           >
             {rowMarkup}
           </IndexTable>
+
+          {selectedReport && (
+            <Modal id="display-modal">
+              <div className="w-full bg-white border rounded-lg p-6 shadow-lg space-y-6">
+                <div className="flex justify-between items-center">
+                  <Text as="h2" variant="headingMd">
+                    Report Details
+                  </Text>
+                  <div className="flex items-center gap-2">
+                    <Button tone="critical" size="slim" onClick={() => {}}>
+                      Delete
+                    </Button>
+                    <Button size="slim" onClick={() => setSelectedReport(null)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="w-full flex justify-center">
+                  <img
+                    src={
+                      selectedReport?.image ||
+                      "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                    }
+                    alt="Report"
+                    className="max-w-[300px] max-h-[300px] object-cover rounded-md shadow"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <p>
+                    <span className="font-semibold">Medication:</span>{" "}
+                    {selectedReport.medication}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Age:</span>{" "}
+                    {selectedReport.age}
+                  </p>
+                  <p>
+                    <span className="font-semibold">State:</span>{" "}
+                    {selectedReport.state}
+                  </p>
+                  <p>
+                    <span className="font-semibold">City:</span>{" "}
+                    {selectedReport.city}
+                  </p>
+                  <p>
+                    <span className="font-semibold">IP Address:</span>{" "}
+                    {selectedReport.ipAddress}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Submitted On:</span>{" "}
+                    {new Date(selectedReport.createdAt).toLocaleDateString()}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Status:</span>{" "}
+                    <Badge
+                      tone={
+                        selectedReport?.isQualify === "approved"
+                          ? `success`
+                          : selectedReport?.isQualify === "rejected"
+                            ? "critical"
+                            : selectedReport?.isQualify == "new"
+                              ? "info-strong"
+                              : "warning"
+                      }
+                    >
+                      {selectedReport.isQualify}
+                    </Badge>
+                  </p>
+                </div>
+              </div>
+            </Modal>
+          )}
         </LegacyCard>
       </div>
     </Page>
