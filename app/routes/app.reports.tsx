@@ -100,8 +100,15 @@ const Testing = () => {
   const fetchReports = async (currentPage: number, query: string = "") => {
     try {
       setLoading(true);
+      let activeReport: any[] = [];
+      if (activeButton === "approved") {
+        const { data } = await apiClient.get<ApiResponse>(
+          `/admin/reports?limit=15&page=${currentPage}&filter=approved`,
+        );
+        activeReport = data?.data?.reports;
+      }
       const { data } = await apiClient.get<ApiResponse>(
-        `/admin/reports?limit=15&page=${currentPage}&filter=${activeButton}&q=${query}&state=${state}&medication=${medication}&age=${ageGroup}&status=${filterStatus}`,
+        `/admin/reports?limit=15&page=${currentPage}&filter=${activeButton === "approved" && !activeReport?.length ? "auto-approved" : activeButton}&q=${query}&state=${state}&medication=${medication}&age=${ageGroup}&status=${filterStatus}`,
       );
       if (data?.statusCode === 200) {
         setReports(data?.data.reports);
@@ -465,6 +472,7 @@ const Testing = () => {
             onClearAll={handleFiltersClearAll}
             mode={mode}
             setMode={setMode}
+            canCreateNewView={false}
           />
           <IndexTable
             condensed={useBreakpoints().smDown}
