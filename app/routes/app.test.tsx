@@ -19,6 +19,7 @@ import apiClient from "app/config/AxiosInstance";
 import { useState, useCallback, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { Modal } from "@shopify/app-bridge-react";
+import axios from "axios";
 function disambiguateLabel(key: string, value: string | any[]): string {
   switch (key) {
     case "ageGroup":
@@ -59,6 +60,7 @@ interface ReportProps {
   isQualify: string;
   medication: string;
   state: string;
+  source?: string;
   image: string;
 }
 
@@ -83,6 +85,7 @@ const Testing = () => {
     [page, setPage] = useState<number>(1),
     [totalPages, setTotalPages] = useState<number>(1),
     [selectedReport, setSelectedReport] = useState<ReportProps | null>(null),
+    [refresh, setRefresh] = useState<boolean>(false),
     [searchQuery, setSearchQuery] = useState<string>("");
   const [selected, setSelected] = useState(0);
 
@@ -98,7 +101,7 @@ const Testing = () => {
     try {
       setLoading(true);
       const { data } = await apiClient.get<ApiResponse>(
-        `/admin/reports?page=${currentPage}&filter=${activeButton}&q=${query}&state=${state}&medication=${medication}&age=${ageGroup}&status=${filterStatus}`,
+        `/admin/reports?limit=15&page=${currentPage}&filter=${activeButton}&q=${query}&state=${state}&medication=${medication}&age=${ageGroup}&status=${filterStatus}`,
       );
       if (data?.statusCode === 200) {
         setReports(data?.data.reports);
@@ -113,34 +116,37 @@ const Testing = () => {
 
   useEffect(() => {
     fetchReports(page, searchQuery);
-  }, [page, activeButton, state, medication, ageGroup, filterStatus]);
+  }, [page, activeButton, state, medication, ageGroup, filterStatus, refresh]);
 
   const [itemStrings] = useState([
     "All",
     "New",
     "Approved",
     "Rejected",
-    "Source",
+    // "Source",
   ]);
 
+  const handleDelete = async (id: string) => {
+    const confirmDelete = confirm(
+      "Are you sure you want to delete this entry ?",
+    );
+    if (!confirmDelete) return;
+    try {
+      const { data } = await apiClient.delete(`/admin/reports/${id}`);
+      if (data?.statusCode === 200) {
+        shopify.toast.show(data?.message || "Report deleted");
+      }
+      setReports((prev) => prev.filter((report) => report._id !== id));
+      if (selectedReport?._id === id) {
+        setSelectedReport(null);
+      }
+    } catch (error) {
+      console.error("Error deleting report", error);
+    }
+  };
   const handleQualifyChange = async (id: string, newValue: string) => {
     if (newValue === "delete") {
-      const confirmDelete = confirm(
-        "Are you sure you want to delete this entry ?",
-      );
-      if (!confirmDelete) return;
-      try {
-        const { data } = await apiClient.delete(`/admin/reports/${id}`);
-        if (data?.statusCode === 200) {
-          shopify.toast.show(data?.message || "Report deleted");
-        }
-        setReports((prev) => prev.filter((report) => report._id !== id));
-        if (selectedReport?._id === id) {
-          setSelectedReport(null);
-        }
-      } catch (error) {
-        console.error("Error deleting report", error);
-      }
+      handleDelete(id);
     } else {
       try {
         await apiClient.put(`/admin/request-approval/${id}`, {
@@ -331,6 +337,7 @@ const Testing = () => {
         isQualify,
         medication,
         state,
+        source,
       },
       index,
     ) => (
@@ -353,6 +360,7 @@ const Testing = () => {
         <IndexTable.Cell>
           {new Date(createdAt).toLocaleDateString()}
         </IndexTable.Cell>
+        <IndexTable.Cell>{source || "defent.com"}</IndexTable.Cell>
         <IndexTable.Cell>
           <Badge
             tone={
@@ -391,6 +399,7 @@ const Testing = () => {
                 isQualify,
                 medication,
                 state,
+                source,
               });
               shopify.modal.show("display-modal");
             }}
@@ -403,23 +412,32 @@ const Testing = () => {
   );
   const bulkActions = [
     {
-      content: "Add tags",
-      onAction: () => console.log("Todo: implement bulk add tags"),
-    },
-    {
-      content: "Remove tags",
-      onAction: () => console.log("Todo: implement bulk remove tags"),
-    },
-    {
       icon: DeleteIcon,
       destructive: true,
-      content: "Delete customers",
-      onAction: () => console.log("Todo: implement bulk delete"),
+      content: "Delete",
+      onAction: async () => {
+        try {
+          const confirmDelete = confirm("Are you sure you want to delete ?");
+          if (!confirmDelete) return;
+          const { data } = await apiClient.delete("/admin/bulk/delete", {
+            data: {
+              ids: selectedResources,
+            },
+          });
+          console.log(data, "data");
+          if (data?.statusCode === 200) {
+            shopify.toast.show(data?.message || "All entries deleted");
+            setRefresh(!refresh);
+          }
+        } catch (error) {
+          shopify.toast.show("Error while deleting");
+        }
+      },
     },
   ];
 
   return (
-    <Page title="Reprots">
+    <Page title="Reports">
       <div className="relative">
         <div className="absolute bottom-3 z-[999] right-6">
           <Text as="span" variant="bodySm">
@@ -462,6 +480,7 @@ const Testing = () => {
               { title: "City" },
               { title: "Ip address" },
               { title: "Submitted On" },
+              { title: "Source" },
               { title: "Status" },
               { title: "Action" },
               { title: "View" },
@@ -485,27 +504,17 @@ const Testing = () => {
                     Report Details
                   </Text>
                   <div className="flex items-center gap-2">
-                    <Button tone="critical" size="slim" onClick={() => {}}>
+                    <Button
+                      tone="critical"
+                      size="slim"
+                      onClick={() => handleDelete(selectedReport?._id)}
+                    >
                       Delete
-                    </Button>
-                    <Button size="slim" onClick={() => setSelectedReport(null)}>
-                      Close
                     </Button>
                   </div>
                 </div>
 
-                <div className="w-full flex justify-center">
-                  <img
-                    src={
-                      selectedReport?.image ||
-                      "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                    }
-                    alt="Report"
-                    className="max-w-[300px] max-h-[300px] object-cover rounded-md shadow"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-4 text-sm">
                   <p>
                     <span className="font-semibold">Medication:</span>{" "}
                     {selectedReport.medication}
@@ -546,6 +555,20 @@ const Testing = () => {
                       {selectedReport.isQualify}
                     </Badge>
                   </p>
+                  <p>
+                    <span className="font-semibold">Source:</span>
+                    {selectedReport?.source || "defent.com"}
+                  </p>
+                </div>
+                <div className="w-full flex justify-center">
+                  <img
+                    src={
+                      selectedReport?.image ||
+                      "https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                    }
+                    alt="Report"
+                    className="max-w-[300px] max-h-[300px] object-cover rounded-md shadow"
+                  />
                 </div>
               </div>
             </Modal>
