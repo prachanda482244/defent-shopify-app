@@ -46,7 +46,7 @@ function isEmpty(value: string | string[]): boolean {
 
 const actionOptions = [
   { label: "New", value: "new" },
-  { label: "Auto Approved", value: "auto-approved" },
+  // { label: "Auto Approved", value: "auto-approved" },
   { label: "Approved", value: "approved" },
   { label: "Rejected", value: "rejected" },
   { label: "Delete Report", value: "delete" },
@@ -382,6 +382,7 @@ const Testing = () => {
             label=""
             value={isQualify}
             options={actionOptions}
+            disabled={isQualify === "auto-approved"}
             onChange={(newValue) => handleQualifyChange(_id, newValue)}
           />
         </IndexTable.Cell>

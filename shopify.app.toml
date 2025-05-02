@@ -3,7 +3,7 @@
 client_id = "df9110b7614a935e763101fea3f1e4f2"
 name = "defent-app"
 handle = "defent-app"
-application_url = "https://parcel-industrial-checked-bits.trycloudflare.com"
+application_url = "https://biol-jul-reform-statutes.trycloudflare.com"
 embedded = true
 
 [build]
@@ -28,9 +28,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://parcel-industrial-checked-bits.trycloudflare.com/auth/callback",
-  "https://parcel-industrial-checked-bits.trycloudflare.com/auth/shopify/callback",
-  "https://parcel-industrial-checked-bits.trycloudflare.com/api/auth/callback"
+  "https://biol-jul-reform-statutes.trycloudflare.com/auth/callback",
+  "https://biol-jul-reform-statutes.trycloudflare.com/auth/shopify/callback",
+  "https://biol-jul-reform-statutes.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
