@@ -370,7 +370,7 @@ const Testing = () => {
         <IndexTable.Cell>{age}</IndexTable.Cell>
         <IndexTable.Cell>{state}</IndexTable.Cell>
         <IndexTable.Cell>{city}</IndexTable.Cell>
-        <IndexTable.Cell>{ipAddress}</IndexTable.Cell>
+        
         <IndexTable.Cell>
           {new Date(createdAt).toLocaleDateString()}
         </IndexTable.Cell>
@@ -494,7 +494,7 @@ const Testing = () => {
               { title: "Age" },
               { title: "State" },
               { title: "City" },
-              { title: "Ip address" },
+              
               { title: "Submitted On" },
               { title: "Source" },
               { title: "Status" },
