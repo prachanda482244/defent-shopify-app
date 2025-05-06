@@ -370,7 +370,7 @@ const Testing = () => {
         <IndexTable.Cell>{age}</IndexTable.Cell>
         <IndexTable.Cell>{state}</IndexTable.Cell>
         <IndexTable.Cell>{city}</IndexTable.Cell>
-        
+
         <IndexTable.Cell>
           {new Date(createdAt).toLocaleDateString()}
         </IndexTable.Cell>
@@ -478,11 +478,12 @@ const Testing = () => {
             appliedFilters={appliedFilters}
             onClearAll={handleFiltersClearAll}
             mode={mode}
+            isFlushWhenSticky
             setMode={setMode}
             canCreateNewView={false}
           />
           <IndexTable
-            condensed={useBreakpoints().smDown}
+            // condensed={useBreakpoints().smDown}
             resourceName={resourceName}
             itemCount={reports.length}
             selectedItemsCount={
@@ -494,7 +495,7 @@ const Testing = () => {
               { title: "Age" },
               { title: "State" },
               { title: "City" },
-              
+
               { title: "Submitted On" },
               { title: "Source" },
               { title: "Status" },

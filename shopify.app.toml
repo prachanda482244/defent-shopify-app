@@ -1,9 +1,9 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "df9110b7614a935e763101fea3f1e4f2"
-name = "defent-app"
-handle = "defent-app"
-application_url = "https://pose-occur-typical-constant.trycloudflare.com"
+client_id = "3b25a5dad14fc8d8919c05f55c2df6f3"
+name = "Defent Custom App"
+handle = "defent-custom-app"
+application_url = "https://supposed-expand-sailing-pumps.trycloudflare.com"
 embedded = true
 
 [build]
@@ -28,9 +28,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://pose-occur-typical-constant.trycloudflare.com/auth/callback",
-  "https://pose-occur-typical-constant.trycloudflare.com/auth/shopify/callback",
-  "https://pose-occur-typical-constant.trycloudflare.com/api/auth/callback"
+  "https://supposed-expand-sailing-pumps.trycloudflare.com/auth/callback",
+  "https://supposed-expand-sailing-pumps.trycloudflare.com/auth/shopify/callback",
+  "https://supposed-expand-sailing-pumps.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
