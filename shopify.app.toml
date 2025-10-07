@@ -3,7 +3,7 @@
 client_id = "3b25a5dad14fc8d8919c05f55c2df6f3"
 name = "Defent Custom App"
 handle = "defent-custom-app"
-application_url = "https://supposed-expand-sailing-pumps.trycloudflare.com"
+application_url = "https://defent-shopify-app-1.onrender.com"
 embedded = true
 
 [build]
@@ -27,9 +27,9 @@ scopes = "write_products,read_orders,write_orders"
 
 [auth]
 redirect_urls = [
-  "https://supposed-expand-sailing-pumps.trycloudflare.com/auth/callback",
-  "https://supposed-expand-sailing-pumps.trycloudflare.com/auth/shopify/callback",
-  "https://supposed-expand-sailing-pumps.trycloudflare.com/api/auth/callback"
+  "https://defent-shopify-app-1.onrender.com/auth/callback",
+  "https://defent-shopify-app-1.onrender.com/auth/shopify/callback",
+  "https://defent-shopify-app-1.onrender.com/api/auth/callback"
 ]
 
 [pos]
