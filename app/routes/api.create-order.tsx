@@ -2,6 +2,7 @@ import { ActionFunctionArgs } from "@remix-run/node";
 import { CreateOrderREST } from "app/utils/Orders";
 import db from "../db.server";
 import axios from "axios";
+import { accessToken } from "app/constant";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const ct = request.headers.get("content-type") || "";
@@ -20,7 +21,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     },
   });
   const shop = "defent.myshopify.com";
-  const accessToken = "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";
   if (!shop || !accessToken) {
     return { success: false, message: "Shop or access token missing" };
   }
