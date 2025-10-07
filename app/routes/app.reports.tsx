@@ -19,7 +19,6 @@ import apiClient from "app/config/AxiosInstance";
 import { useState, useCallback, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { Modal } from "@shopify/app-bridge-react";
-import axios from "axios";
 function disambiguateLabel(key: string, value: string | any[]): string {
   switch (key) {
     case "ageGroup":
