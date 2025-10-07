@@ -1,5 +1,4 @@
 import { ActionFunctionArgs } from "@remix-run/node";
-import { apiVersion } from "app/shopify.server";
 import { CreateOrderREST } from "app/utils/Orders";
 import db from "../db.server";
 import axios from "axios";
@@ -15,16 +14,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     payload = Object.fromEntries(fd as any);
   }
 
-  const { shop, accessToken } = await db.session.findFirst({
+  const shopData = await db.session.findFirst({
     where: {
       shop: "defent.myshopify.com",
     },
   });
+  const shop = shopData?.shop || "";
+  const accessToken = shopData?.accessToken || "";
+  if (!shop || !accessToken) {
+    return { success: false, message: "Shop or access token missing" };
+  }
   const { firstName, lastName, streetAddress, postCode, email, productId } =
     payload;
   try {
     const { data } = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/order`,
+      //   `${import.meta.env.VITE_BASE_URL}/order`,
+      `http://localhost:5000/api/v1/order`,
       {
         firstName,
         lastName,
@@ -42,7 +47,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const order = await CreateOrderREST({
       accessToken,
       shop,
-      apiVersion: apiVersion || "2024-10",
+      apiVersion: "2024-10",
       firstName,
       lastName,
       streetAddress,
@@ -55,6 +60,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       order,
     };
   } catch (error: any) {
+    console.log(error, "errr");
     return {
       success: false,
       message: error?.message || "Something went wrong",
