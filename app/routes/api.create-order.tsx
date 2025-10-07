@@ -20,7 +20,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop: "defent.myshopify.com",
     },
   });
-  const shop = "defent.myshopify.com";
+  const shop = "prachanda-test.myshopify.com";
+  console.log(accessToken, "atok");
   if (!shop || !accessToken) {
     return { success: false, message: "Shop or access token missing" };
   }
@@ -28,8 +29,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     payload;
   try {
     const { data } = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/order`,
-      //   `http://localhost:5000/api/v1/order`,
+      //   `${import.meta.env.VITE_BASE_URL}/order`,
+      `http://localhost:5000/api/v1/order`,
       {
         firstName,
         lastName,

@@ -23,9 +23,9 @@ import { LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "app/shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   console.log(session, "session");
-
+  console.log("ruin");
   return null;
 };
 function disambiguateLabel(key: string, value: string | any[]): string {

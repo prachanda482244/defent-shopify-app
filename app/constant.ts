@@ -1,1 +1,1 @@
-export const accessToken = "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";
+export const accessToken = "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";
