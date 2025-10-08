@@ -20,13 +20,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop: "defent.myshopify.com",
     },
   });
-  const shop = "prachanda-test.myshopify.com";
-  console.log(accessToken, "atok");
+
+  const shop = "defent.myshopify.com";
   if (!shop || !accessToken) {
     return { success: false, message: "Shop or access token missing" };
   }
-  const { firstName, lastName, streetAddress, postCode, email, productId } =
-    payload;
+  const {
+    firstName,
+    lastName,
+    streetAddress,
+    postCode,
+    email,
+    productId,
+    subscription,
+    demographics: {
+      age,
+      gender,
+      identity,
+      household_size,
+      ethnicity,
+      household_language,
+    },
+  } = payload;
+
   try {
     const { data } = await axios.post(
       //   `${import.meta.env.VITE_BASE_URL}/order`,
@@ -36,8 +52,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         lastName,
         streetAddress,
         postCode,
+        subscription,
         email,
         productId,
+        age,
+        gender,
+        identity,
+        household_size,
+        ethnicity,
+        household_language,
       },
     );
     if (data?.statusCode !== 200 || !data?.success)
@@ -52,6 +75,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       firstName,
       lastName,
       streetAddress,
+      age,
+      gender,
+      identity,
+      household_size,
+      ethnicity,
+      household_language,
       postCode,
       email,
       productId,
