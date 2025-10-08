@@ -20,9 +20,9 @@ type Item = {
   firstName: string;
   lastName: string;
   email: string;
-  subscription: string; // "monthly" | "one_time" | others
+  subscription: string;
   streetAddress: string;
-  lastRenewAt: string; // ISO
+  lastRenewAt: string; // use as createdAt
 };
 
 type OrdersResponse = {
@@ -40,6 +40,8 @@ const fmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "2-digit",
 });
+const addDays = (d: Date, n: number) =>
+  new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
 
 const Subscription = () => {
   const [items, setItems] = useState<Item[]>([]);
@@ -78,7 +80,6 @@ const Subscription = () => {
     setTarget(item);
     setModalOpen(true);
   }, []);
-
   const confirmCancel = useCallback(async () => {
     if (!target) return;
     setActionBusy(target._id);
@@ -96,23 +97,19 @@ const Subscription = () => {
 
   const headings = useMemo(
     () => [
-      { title: "Customer" },
-      { title: "Email" },
+      { title: "Customer" }, // name + email stacked
       { title: "Subscription" },
       { title: "Active" },
       { title: "Street address" },
-      { title: "Last renew" },
+      { title: "Created at" }, // was “Last renew”
+      { title: "Next order" }, // createdAt + 30 days
       { title: "Action" },
     ],
     [],
   );
 
   return (
-    <Page
-      title="Subscription"
-      primaryAction={undefined}
-      subtitle="Customers in the past 30 days"
-    >
+    <Page title="Subscription" subtitle="Customers in the past 30 days">
       <LegacyCard>
         <IndexTable
           resourceName={{ singular: "subscription", plural: "subscriptions" }}
@@ -133,11 +130,12 @@ const Subscription = () => {
           }
         >
           {items.map((item, index) => {
+            const createdAt = item.lastRenewAt
+              ? new Date(item.lastRenewAt)
+              : null; // treat as createdAt
+            const nextOrder = createdAt ? addDays(createdAt, 30) : null;
             const name =
               `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() || "—";
-            const date = item.lastRenewAt
-              ? fmt.format(new Date(item.lastRenewAt))
-              : "—";
             return (
               <IndexTable.Row
                 id={item._id}
@@ -146,15 +144,16 @@ const Subscription = () => {
                 selected={selectedResources.includes(item._id)}
               >
                 <IndexTable.Cell>
-                  <Text as="span" variant="bodyMd" fontWeight="semibold">
-                    {name}
-                  </Text>
+                  <BlockStack gap="050">
+                    <Text as="span" variant="bodyMd" fontWeight="semibold">
+                      {name}
+                    </Text>
+                    <Text as="span" tone="subdued" variant="bodySm">
+                      {item.email || "—"}
+                    </Text>
+                  </BlockStack>
                 </IndexTable.Cell>
-                <IndexTable.Cell>
-                  <Text as="span" variant="bodyMd">
-                    {item.email || "—"}
-                  </Text>
-                </IndexTable.Cell>
+
                 <IndexTable.Cell>
                   <Badge
                     tone={
@@ -164,21 +163,31 @@ const Subscription = () => {
                     {item.subscription || "—"}
                   </Badge>
                 </IndexTable.Cell>
+
                 <IndexTable.Cell>
                   <Badge tone={item.isActive ? "success" : "critical"}>
                     {item.isActive ? "Active" : "Inactive"}
                   </Badge>
                 </IndexTable.Cell>
+
                 <IndexTable.Cell>
                   <Text as="span" variant="bodyMd">
                     {item.streetAddress || "—"}
                   </Text>
                 </IndexTable.Cell>
+
                 <IndexTable.Cell>
                   <Text as="span" variant="bodyMd">
-                    {date}
+                    {createdAt ? fmt.format(createdAt) : "—"}
                   </Text>
                 </IndexTable.Cell>
+
+                <IndexTable.Cell>
+                  <Text as="span" variant="bodyMd">
+                    {nextOrder ? fmt.format(nextOrder) : "—"}
+                  </Text>
+                </IndexTable.Cell>
+
                 <IndexTable.Cell>
                   <InlineStack gap="200">
                     <Button
@@ -218,7 +227,6 @@ const Subscription = () => {
         </BlockStack>
       </LegacyCard>
 
-      {/* Polaris Modal, not App Bridge Modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
