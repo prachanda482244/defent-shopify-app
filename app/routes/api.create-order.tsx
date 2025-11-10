@@ -77,6 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       firstName,
       lastName,
       streetAddress,
+      streetAddress2,
       age,
       gender,
       identity,

@@ -8,6 +8,7 @@ type CreateOrderRestArgs = {
   firstName: string;
   lastName: string;
   streetAddress: string;
+  streetAddress2?: string;
   // e.g. "US"
   postCode: string;
   email: string;
@@ -29,7 +30,7 @@ export async function CreateOrderREST({
   firstName,
   lastName,
   streetAddress,
-
+  streetAddress2,
   postCode,
   email,
   productId,
@@ -98,6 +99,7 @@ export async function CreateOrderREST({
         { name: "Household Size", value: household_size },
         { name: "Ethnicity", value: joinMulti(ethnicity) },
         { name: "Household Language", value: joinMulti(household_language) },
+        { name: "Street Address 2", value: streetAddress2 || "" },
       ],
       // note: "any freeform note",
       // tags: "web,demographics",
