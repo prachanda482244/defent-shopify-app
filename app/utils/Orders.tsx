@@ -100,7 +100,7 @@ export async function CreateOrderREST({
         //   { name: "Household Size", value: household_size },
         //   { name: "Ethnicity", value: joinMulti(ethnicity) },
         //   { name: "Household Language", value: joinMulti(household_language) },
-        { name: "Street Address 2", value: streetAddress2 || "" },
+        // { name: "Street Address 2", value: streetAddress2 || "" },
       ],
       // note: "any freeform note",
       // tags: "web,demographics",
