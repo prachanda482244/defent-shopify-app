@@ -73,6 +73,7 @@ export async function CreateOrderREST({
     first_name: firstName,
     last_name: lastName,
     address1: streetAddress,
+    address2: streetAddress2,
     country: "United States", // "US", "CA", etc.
     zip: postCode,
     city: "West Hollywood.",
