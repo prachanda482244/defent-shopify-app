@@ -15,16 +15,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     payload = Object.fromEntries(fd as any);
   }
 
-  const shopData = await db.session.findFirst({
-    where: {
-      shop: "defent.myshopify.com",
-    },
-  });
-
   const shop = "defent.myshopify.com";
   if (!shop || !accessToken) {
     return { success: false, message: "Shop or access token missing" };
   }
+  console.log("APi hit");
   const {
     firstName,
     lastName,
@@ -43,11 +38,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       household_language,
     },
   } = payload;
-
+  console.log({ payload });
   try {
     const { data } = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/order`,
-      // `http://localhost:5000/api/v1/order`,
+      // `${import.meta.env.VITE_BASE_URL}/order`,
+      `http://localhost:5000/api/v1/order`,
       {
         firstName,
         lastName,
@@ -73,7 +68,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const order = await CreateOrderREST({
       accessToken,
       shop,
-      apiVersion: "2024-10",
+      apiVersion: "2025-10",
       firstName,
       lastName,
       streetAddress,

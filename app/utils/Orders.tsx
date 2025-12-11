@@ -109,6 +109,7 @@ export async function CreateOrderREST({
   };
 
   const res = await client.post("/orders.json", payload);
+  console.log("Order created:", res.data.order);
   const order = res.data.order as { id: number };
 
   // OPTIONAL: also write structured metafields on the order

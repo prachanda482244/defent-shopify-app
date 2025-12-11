@@ -25,7 +25,6 @@ import { authenticate } from "app/shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   console.log(session, "session");
-  console.log("ruin");
   return null;
 };
 function disambiguateLabel(key: string, value: string | any[]): string {
