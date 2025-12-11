@@ -6,20 +6,28 @@ import { accessToken } from "app/constant";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const ct = request.headers.get("content-type") || "";
-
   let payload: any;
-  if (ct.includes("application/json")) {
-    payload = await request.json();
-  } else {
-    const fd = await request.formData();
-    payload = Object.fromEntries(fd as any);
+
+  try {
+    if (ct.includes("application/json")) {
+      payload = await request.json();
+    } else {
+      const fd = await request.formData();
+      payload = Object.fromEntries(fd as any);
+    }
+  } catch (err) {
+    console.error("Failed to parse request payload:", err);
+    return { success: false, message: "Invalid request payload" };
   }
 
   const shop = "defent.myshopify.com";
   if (!shop || !accessToken) {
+    console.error("Missing credentials", { shop, accessToken });
     return { success: false, message: "Shop or access token missing" };
   }
-  console.log("APi hit");
+
+  console.log("API hit", { payload });
+
   const {
     firstName,
     lastName,
@@ -36,13 +44,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       household_size,
       ethnicity,
       household_language,
-    },
+    } = {},
   } = payload;
-  console.log({ payload });
+
   try {
     const { data } = await axios.post(
       `${import.meta.env.VITE_BASE_URL}/order`,
-      // `http://localhost:5000/api/v1/order`,
       {
         firstName,
         lastName,
@@ -60,11 +67,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         household_language,
       },
     );
-    if (data?.statusCode !== 200 || !data?.success)
+
+    if (data?.statusCode !== 200 || !data?.success) {
+      console.error("Backend returned failure:", data);
       return {
         success: false,
-        message: data?.message || "Something went wrong",
+        message: data?.message || "Order creation failed",
       };
+    }
+
     const order = await CreateOrderREST({
       accessToken,
       shop,
@@ -83,15 +94,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       email,
       productId,
     });
-    return {
-      success: true,
-      order,
-    };
+
+    return { success: true, order };
   } catch (error: any) {
-    console.log(error, "errr");
+    const errorInfo = {
+      message: error?.message,
+      status: error?.response?.status,
+      responseData: error?.response?.data,
+      stack: error?.stack,
+    };
+
+    console.error("Order creation failed:", errorInfo);
+
     return {
       success: false,
-      message: error?.message || "Something went wrong",
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        "Something went wrong",
     };
   }
 };

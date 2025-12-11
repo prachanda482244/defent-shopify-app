@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// add these fields to your args
 type CreateOrderRestArgs = {
   shop: string;
   accessToken: string;
@@ -23,24 +22,26 @@ type CreateOrderRestArgs = {
 
 const joinMulti = (a?: string[]) => (a && a.length ? a.join(", ") : "");
 
-export async function CreateOrderREST({
-  shop,
-  accessToken,
-  apiVersion = "2024-10",
-  firstName,
-  lastName,
-  streetAddress,
-  streetAddress2,
-  postCode,
-  email,
-  productId,
-  age,
-  gender,
-  identity,
-  household_size,
-  ethnicity,
-  household_language,
-}: CreateOrderRestArgs) {
+export async function CreateOrderREST(args: CreateOrderRestArgs) {
+  const {
+    shop,
+    accessToken,
+    apiVersion = "2024-10",
+    firstName,
+    lastName,
+    streetAddress,
+    streetAddress2,
+    postCode,
+    email,
+    productId,
+    age,
+    gender,
+    identity,
+    household_size,
+    ethnicity,
+    household_language,
+  } = args;
+
   if (!shop || !accessToken) throw new Error("shop and accessToken required");
   if (!productId) throw new Error("productId required");
 
@@ -55,93 +56,119 @@ export async function CreateOrderREST({
     timeout: 20000,
   });
 
-  // resolve variant_id
-  const gidToNumeric = (id: string) =>
-    Number((id.match(/\/(\d+)$/) || [])[1] || id);
-  let variantId: number | null = null;
-  if (/ProductVariant/i.test(productId)) {
-    variantId = gidToNumeric(productId);
-  } else {
-    const { data } = await client.get<{
-      product: { variants: { id: number }[] };
-    }>(`/products/${gidToNumeric(productId)}.json`);
-    variantId = data?.product?.variants?.[0]?.id ?? null;
-  }
-  if (!variantId) throw new Error("No variant found for productId");
-
-  const addr = {
-    first_name: firstName,
-    last_name: lastName,
-    address1: streetAddress,
-    address2: streetAddress2,
-    country: "United States", // "US", "CA", etc.
-    zip: postCode,
-    city: "West Hollywood.",
-    province: "California",
-    country_code: "US",
-    province_code: "CA",
-  };
-
-  const payload = {
-    order: {
-      email,
-      line_items: [{ variant_id: variantId, quantity: 1 }],
-      shipping_address: addr,
-      billing_address: addr,
-      customer: {
-        first_name: firstName,
-        last_name: lastName,
-        email,
-      },
-      note_attributes: [
-        //   { name: "Age", value: age },
-        //   { name: "Gender", value: gender },
-        //   { name: "Identity", value: identity },
-        //   { name: "Household Size", value: household_size },
-        //   { name: "Ethnicity", value: joinMulti(ethnicity) },
-        //   { name: "Household Language", value: joinMulti(household_language) },
-        // { name: "Street Address 2", value: streetAddress2 || "" },
-      ],
-      // note: "any freeform note",
-      // tags: "web,demographics",
-      // send_receipt: false,
-    },
-  };
-
-  const res = await client.post("/orders.json", payload);
-  console.log("Order created:", res.data.order);
-  const order = res.data.order as { id: number };
-
-  // OPTIONAL: also write structured metafields on the order
   try {
-    const metas = [
-      { key: "age", type: "single_line_text_field", value: age },
-      { key: "gender", type: "single_line_text_field", value: gender },
-      { key: "identity", type: "single_line_text_field", value: identity },
-      {
-        key: "household_size",
-        type: "single_line_text_field",
-        value: household_size,
+    // ----------------------------
+    // 1. Resolve product variant
+    // ----------------------------
+    const gidToNumeric = (id: string) =>
+      Number((id.match(/\/(\d+)$/) || [])[1] || id);
+
+    let variantId: number | null = null;
+
+    if (/ProductVariant/i.test(productId)) {
+      variantId = gidToNumeric(productId);
+    } else {
+      const { data } = await client.get<{
+        product: { variants: { id: number }[] };
+      }>(`/products/${gidToNumeric(productId)}.json`);
+
+      variantId = data?.product?.variants?.[0]?.id ?? null;
+    }
+
+    if (!variantId) throw new Error("No variant found for productId");
+
+    // ----------------------------
+    // 2. Construct order payload
+    // ----------------------------
+    const addr = {
+      first_name: firstName,
+      last_name: lastName,
+      address1: streetAddress,
+      address2: streetAddress2,
+      country: "United States",
+      zip: postCode,
+      city: "West Hollywood.",
+      province: "California",
+      country_code: "US",
+      province_code: "CA",
+    };
+
+    const payload = {
+      order: {
+        email,
+        line_items: [{ variant_id: variantId, quantity: 1 }],
+        shipping_address: addr,
+        billing_address: addr,
+        customer: { first_name: firstName, last_name: lastName, email },
       },
-      {
-        key: "ethnicity",
-        type: "json",
-        value: JSON.stringify(ethnicity || []),
-      },
-      {
-        key: "household_language",
-        type: "json",
-        value: JSON.stringify(household_language || []),
-      },
-    ];
-    for (const m of metas) {
-      await client.post(`/orders/${order.id}/metafields.json`, {
-        metafield: { namespace: "demographics", ...m },
+    };
+
+    // ----------------------------
+    // 3. Create order on Shopify
+    // ----------------------------
+    const res = await client.post("/orders.json", payload);
+    console.log("Order created:", res.data.order);
+
+    const order = res.data.order as { id: number };
+
+    // ----------------------------
+    // 4. Save metafields (optional)
+    // ----------------------------
+    try {
+      const metas = [
+        { key: "age", type: "single_line_text_field", value: age },
+        { key: "gender", type: "single_line_text_field", value: gender },
+        { key: "identity", type: "single_line_text_field", value: identity },
+        {
+          key: "household_size",
+          type: "single_line_text_field",
+          value: household_size,
+        },
+        {
+          key: "ethnicity",
+          type: "json",
+          value: JSON.stringify(ethnicity || []),
+        },
+        {
+          key: "household_language",
+          type: "json",
+          value: JSON.stringify(household_language || []),
+        },
+      ];
+
+      for (const m of metas) {
+        await client.post(`/orders/${order.id}/metafields.json`, {
+          metafield: { namespace: "demographics", ...m },
+        });
+      }
+    } catch (metaErr: any) {
+      console.error("Metafield write failed:", {
+        message: metaErr?.message,
+        response: metaErr?.response?.data,
       });
     }
-  } catch (_) {
-    // ignore metafield errors if not critical
-  }
 
-  return { success: true, order: res.data.order };
+    return { success: true, order: res.data.order };
+  } catch (error: any) {
+    // ----------------------------
+    // 5. Structured error logging
+    // ----------------------------
+    const log = {
+      message: error?.message,
+      status: error?.response?.status,
+      responseData: error?.response?.data,
+      headers: error?.response?.headers,
+      stack: error?.stack,
+      args: { ...args, accessToken: "***redacted***" },
+    };
+
+    console.error("CreateOrderREST FAILED:", log);
+
+    throw new Error(
+      error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Shopify order creation failed",
+    );
+  }
 }
