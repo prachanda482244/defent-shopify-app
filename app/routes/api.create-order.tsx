@@ -41,8 +41,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   console.log({ payload });
   try {
     const { data } = await axios.post(
-      // `${import.meta.env.VITE_BASE_URL}/order`,
-      `http://localhost:5000/api/v1/order`,
+      `${import.meta.env.VITE_BASE_URL}/order`,
+      // `http://localhost:5000/api/v1/order`,
       {
         firstName,
         lastName,
