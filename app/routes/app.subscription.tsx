@@ -107,9 +107,9 @@ const Subscription = () => {
     ],
     [],
   );
-
+  console.log(items, "items");
   return (
-    <Page title="Subscription" subtitle="Customers in the past 30 days">
+    <Page title="Subscription " subtitle="Customers in the past 30 days">
       <LegacyCard>
         <IndexTable
           resourceName={{ singular: "subscription", plural: "subscriptions" }}
