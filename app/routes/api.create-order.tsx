@@ -26,8 +26,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { success: false, message: "Shop or access token missing" };
   }
 
-  console.log("API hit", { payload });
-
   const {
     firstName,
     lastName,
@@ -98,6 +96,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { success: true, order };
   } catch (error: any) {
     const errorInfo = {
+      date: new Date().toISOString(),
       message: error?.message,
       status: error?.response?.status,
       responseData: error?.response?.data,

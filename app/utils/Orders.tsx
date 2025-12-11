@@ -154,6 +154,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     // 5. Structured error logging
     // ----------------------------
     const log = {
+      date: new Date().toISOString(),
       message: error?.message,
       status: error?.response?.status,
       responseData: error?.response?.data,
