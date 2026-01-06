@@ -548,10 +548,10 @@ const Testing = () => {
                     <span className="font-semibold">City:</span>{" "}
                     {selectedReport.city}
                   </p>
-                  <p>
+                  {/* <p>
                     <span className="font-semibold">IP Address:</span>{" "}
                     {selectedReport.ipAddress}
-                  </p>
+                  </p> */}
                   <p>
                     <span className="font-semibold">Submitted On:</span>{" "}
                     {new Date(selectedReport.createdAt).toLocaleDateString()}
