@@ -107,7 +107,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     // 3. Create order on Shopify
     // ----------------------------
     const res = await client.post("/orders.json", payload);
-    console.log("Order created:", res.data.order);
+    console.log("Order created:", res.data.order?.id);
 
     const order = res.data.order as { id: number };
 
