@@ -76,26 +76,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
-    // const order = await CreateOrderREST({
-    //   accessToken,
-    //   shop,
-    //   apiVersion: "2025-10",
-    //   firstName,
-    //   lastName,
-    //   streetAddress,
-    //   streetAddress2,
-    //   age,
-    //   gender,
-    //   identity,
-    //   household_size,
-    //   ethnicity,
-    //   household_language,
-    //   postCode,
-    //   email,
-    //   productId,
-    // });
+    const order = await CreateOrderREST({
+      accessToken,
+      shop,
+      apiVersion: "2025-10",
+      firstName,
+      lastName,
+      streetAddress,
+      streetAddress2,
+      age,
+      gender,
+      identity,
+      household_size,
+      ethnicity,
+      household_language,
+      identifyAsLGBTQ,
+      postCode,
+      email,
+      productId,
+    });
 
-    return { success: true, order: "created" };
+    return { success: true, order };
   } catch (error: any) {
     const errorInfo = {
       date: new Date().toISOString(),

@@ -15,6 +15,7 @@ type CreateOrderRestArgs = {
   gender: string;
   identity: string;
   household_size: string;
+  identifyAsLGBTQ: boolean;
   ethnicity: string[]; // allow multiple
   household_language: string[]; // allow multiple
   productId: string;
@@ -39,6 +40,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     identity,
     household_size,
     ethnicity,
+    identifyAsLGBTQ,
     household_language,
   } = args;
 
@@ -123,6 +125,11 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
           key: "household_size",
           type: "single_line_text_field",
           value: household_size,
+        },
+        {
+          key: "identifyAsLGBTQ",
+          type: "single_line_text_field",
+          value: identifyAsLGBTQ ? "Yes" : "No",
         },
         {
           key: "ethnicity",
