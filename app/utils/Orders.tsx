@@ -18,6 +18,7 @@ type CreateOrderRestArgs = {
   identifyAsLGBTQ: boolean;
   ethnicity: string[]; // allow multiple
   household_language: string[]; // allow multiple
+  wehoHearAboutUs: string;
   productId: string;
 };
 
@@ -41,6 +42,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     household_size,
     ethnicity,
     identifyAsLGBTQ,
+    wehoHearAboutUs,
     household_language,
   } = args;
 
@@ -131,6 +133,12 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
           type: "single_line_text_field",
           value: identifyAsLGBTQ ? "Yes" : "No",
         },
+        {
+          key: "wehoHearAboutUs",
+          type: "single_line_text_field",
+          value: wehoHearAboutUs,
+        },
+
         {
           key: "ethnicity",
           type: "json",

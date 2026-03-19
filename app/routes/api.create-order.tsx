@@ -43,6 +43,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       ethnicity,
       household_language,
       identifyAsLGBTQ,
+      wehoHearAboutUs,
     } = {},
   } = payload;
 
@@ -65,6 +66,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ethnicity,
         household_language,
         identifyAsLGBTQ,
+        wehoHearAboutUs,
       },
     );
 
@@ -94,6 +96,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       postCode,
       email,
       productId,
+      wehoHearAboutUs,
     });
 
     return { success: true, order };
