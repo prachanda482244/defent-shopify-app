@@ -129,7 +129,7 @@ const Subscription = () => {
             </BlockStack>
           }
         >
-          {items.map((item, index) => {
+          {items?.map((item, index) => {
             const createdAt = item.lastRenewAt
               ? new Date(item.lastRenewAt)
               : null; // treat as createdAt
