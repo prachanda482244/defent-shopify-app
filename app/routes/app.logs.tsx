@@ -540,7 +540,7 @@ const Logs = () => {
                       Refresh
                     </Button>
                     <Button
-                      destructive
+                      tone="critical"
                       icon={DeleteIcon}
                       disabled={!selectedResources.length}
                       loading={bulkDeleteLoading}
@@ -741,7 +741,7 @@ const Logs = () => {
         open={!!selectedLog}
         onClose={() => setSelectedLog(null)}
         title="Incident details"
-        large
+        size="large"
         primaryAction={
           selectedLog
             ? {
