@@ -25,6 +25,7 @@ export default function App() {
           Home
         </Link>
         <Link to="/app/subscription">Subscription</Link>
+        <Link to="/app/logs">Logs</Link>
         {/* <Link to="/app/test">Test</Link> */}
       </NavMenu>
       <Outlet />
