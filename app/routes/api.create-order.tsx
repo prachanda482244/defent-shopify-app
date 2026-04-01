@@ -35,6 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     email,
     productId,
     subscription,
+    flag,
     demographics: {
       age,
       gender,
@@ -67,6 +68,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         household_language,
         identifyAsLGBTQ,
         wehoHearAboutUs,
+        flag,
       },
     );
 
@@ -97,6 +99,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       email,
       productId,
       wehoHearAboutUs,
+      flag,
     });
 
     return { success: true, order };

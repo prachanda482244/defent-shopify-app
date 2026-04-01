@@ -20,10 +20,19 @@ type CreateOrderRestArgs = {
   household_language: string[]; // allow multiple
   wehoHearAboutUs: string;
   productId: string;
+  flag?: "defentWeho" | "defentLA";
 };
 
-const joinMulti = (a?: string[]) => (a && a.length ? a.join(", ") : "");
-
+function getOrderNote(flag?: "defentWeho" | "defentLA") {
+  switch (flag) {
+    case "defentWeho":
+      return "Defent Weho";
+    case "defentLA":
+      return "Defent LA";
+    default:
+      return "";
+  }
+}
 export async function CreateOrderREST(args: CreateOrderRestArgs) {
   const {
     shop,
@@ -44,6 +53,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     identifyAsLGBTQ,
     wehoHearAboutUs,
     household_language,
+    flag,
   } = args;
 
   if (!shop || !accessToken) throw new Error("shop and accessToken required");
@@ -97,9 +107,11 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       province_code: "CA",
     };
 
+    const orderNote = getOrderNote(flag);
     const payload = {
       order: {
         email,
+        note: orderNote,
         line_items: [{ variant_id: variantId, quantity: 1 }],
         shipping_address: addr,
         billing_address: addr,
