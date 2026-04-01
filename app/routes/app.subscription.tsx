@@ -28,7 +28,9 @@ type Item = {
 type OrdersResponse = {
   success: boolean;
   message: string;
-  data: Item[];
+  data: {
+    data: Item[];
+  };
   page: number;
   limit: number;
   total: number;
@@ -60,7 +62,7 @@ const Subscription = () => {
         const { data } = await apiClient.get<OrdersResponse>("/order", {
           params: { page: p, limit },
         });
-        setItems(data?.data ?? []);
+        setItems(data?.data?.data ?? []);
         setTotalPages(data?.totalPages ?? 1);
       } finally {
         setLoading(false);
