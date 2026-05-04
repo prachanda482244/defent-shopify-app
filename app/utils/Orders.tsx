@@ -33,6 +33,18 @@ function getOrderNote(flag?: "defentWeho" | "defentLA") {
       return "";
   }
 }
+
+function getOrderTag(flag?: "defentWeho" | "defentLA"): string {
+  switch (flag) {
+    case "defentWeho":
+      return "WEHO";
+    case "defentLA":
+      return "LA";
+    default:
+      return "";
+  }
+}
+
 export async function CreateOrderREST(args: CreateOrderRestArgs) {
   const {
     shop,
@@ -108,10 +120,12 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     };
 
     const orderNote = getOrderNote(flag);
+    const orderTag = getOrderTag(flag);
     const payload = {
       order: {
         email,
         note: orderNote,
+        tags: orderTag,
         line_items: [{ variant_id: variantId, quantity: 1 }],
         shipping_address: addr,
         billing_address: addr,
