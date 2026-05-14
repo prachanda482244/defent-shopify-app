@@ -112,6 +112,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       order: {
         email,
         note: orderNote,
+
         line_items: [{ variant_id: variantId, quantity: 1 }],
         shipping_address: addr,
         billing_address: addr,
@@ -177,6 +178,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
 
     return { success: true, order: res.data.order };
   } catch (error: any) {
+    console.log(JSON.stringify(error, null, 2), "Shopify order creation error");
     // ----------------------------
     // 5. Structured error logging
     // ----------------------------

@@ -1,6 +1,5 @@
 import { ActionFunctionArgs } from "@remix-run/node";
 import { CreateOrderREST } from "app/utils/Orders";
-import db from "../db.server";
 import axios from "axios";
 import { accessToken } from "app/constant";
 
@@ -32,7 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       stage: "request_parse",
       level: "error",
       message: err?.message || "Failed to parse request payload",
-      stack: err,
+      stack: err?.stack,
       request: {
         method: request.method,
         url: request.url,
@@ -42,13 +41,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { success: false, message: "Invalid request payload" };
   }
 
-  const shop = "defent.myshopify.com";
+  // const shop = "defent.myshopify.com";
+  const shop = "prachanda-test.myshopify.com";
   if (!shop || !accessToken) {
     console.error("Missing credentials", { shop, accessToken });
     return { success: false, message: "Shop or access token missing" };
   }
 
   const {
+    orderId = "",
     firstName,
     lastName,
     streetAddress,
@@ -58,6 +59,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     productId,
     subscription,
     flag,
+    isRenewal = false,
     demographics: {
       age,
       gender,
@@ -71,56 +73,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } = payload;
 
   try {
-    const { data } = await axios.post(`${baseURL}/order`, {
-      firstName,
-      lastName,
-      streetAddress,
-      streetAddress2,
-      postCode,
-      subscription,
-      email,
-      productId,
-      age,
-      gender,
-      identity,
-      household_size,
-      ethnicity,
-      household_language,
-      identifyAsLGBTQ,
-      wehoHearAboutUs,
-      flag,
-    });
-
-    if (data?.statusCode !== 200 || !data?.success) {
-      console.error("Backend returned failure:", data);
-      await sendErrorLog({
-        source: "shopify-app",
-        module: "order-action",
-        stage: "backend_response",
-        level: "error",
-        message: data?.message || "Backend returned failure",
-        statusCode: data?.statusCode,
-        response: {
-          data,
-        },
-        context: {
-          email,
-          productId,
-          flag,
-        },
-        externalService: {
-          name: "orders-backend",
-          endpoint: `${baseURL}/order`,
-          method: "POST",
-        },
-      });
-      return {
-        success: false,
-        message: data?.message || "Order creation failed",
-      };
-    }
-
-    const order = await CreateOrderREST({
+    // 1) Create the real Shopify order FIRST (both first-time and renewal)
+    const shopifyOrder = await CreateOrderREST({
       accessToken,
       shop,
       apiVersion: "2025-10",
@@ -142,7 +96,70 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       flag,
     });
 
-    return { success: true, order };
+    if (!shopifyOrder) {
+      await sendErrorLog({
+        source: "shopify-app",
+        module: "order-action",
+        stage: "shopify_create",
+        level: "error",
+        message: "Shopify order creation returned empty",
+        context: { email, productId, flag, isRenewal },
+        externalService: {
+          name: "shopify",
+          endpoint: "CreateOrderREST",
+          method: "POST",
+        },
+      });
+      return { success: false, message: "Shopify order creation failed" };
+    }
+
+    // 2) Save / update order in Node backend
+    const { data } = await axios.post(`${baseURL}/order`, {
+      orderId,
+      firstName,
+      lastName,
+      streetAddress,
+      streetAddress2,
+      postCode,
+      subscription,
+      email,
+      productId,
+      age,
+      gender,
+      identity,
+      household_size,
+      ethnicity,
+      household_language,
+      identifyAsLGBTQ,
+      wehoHearAboutUs,
+      flag,
+      isRenewal,
+    });
+
+    if (data?.statusCode !== 200 || !data?.success) {
+      console.error("Backend returned failure:", data);
+      await sendErrorLog({
+        source: "shopify-app",
+        module: "order-action",
+        stage: "backend_response",
+        level: "error",
+        message: data?.message || "Backend returned failure",
+        statusCode: data?.statusCode,
+        response: { data },
+        context: { email, productId, flag, isRenewal },
+        externalService: {
+          name: "orders-backend",
+          endpoint: `${baseURL}/order`,
+          method: "POST",
+        },
+      });
+      return {
+        success: false,
+        message: data?.message || "Order creation failed",
+      };
+    }
+
+    return { success: true, order: shopifyOrder };
   } catch (error: any) {
     const errorInfo = {
       date: new Date().toISOString(),
@@ -172,11 +189,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         data: error?.response?.data,
         headers: error?.response?.headers,
       },
-      context: {
-        email,
-        productId,
-        flag,
-      },
+      context: { email, productId, flag, isRenewal },
       externalService: {
         name: error?.config?.baseURL?.includes("shopify")
           ? "shopify"
@@ -185,6 +198,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         method: error?.config?.method,
       },
     });
+
     return {
       success: false,
       message:
