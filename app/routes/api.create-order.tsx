@@ -41,8 +41,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { success: false, message: "Invalid request payload" };
   }
 
-  // const shop = "defent.myshopify.com";
-  const shop = "prachanda-test.myshopify.com";
+  const shop = "defent.myshopify.com";
+  // const shop = "prachanda-test.myshopify.com";
   if (!shop || !accessToken) {
     console.error("Missing credentials", { shop, accessToken });
     return { success: false, message: "Shop or access token missing" };
@@ -73,47 +73,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } = payload;
 
   try {
-    // 1) Create the real Shopify order FIRST (both first-time and renewal)
-    const shopifyOrder = await CreateOrderREST({
-      accessToken,
-      shop,
-      apiVersion: "2025-10",
-      firstName,
-      lastName,
-      streetAddress,
-      streetAddress2,
-      age,
-      gender,
-      identity,
-      household_size,
-      ethnicity,
-      household_language,
-      identifyAsLGBTQ,
-      postCode,
-      email,
-      productId,
-      wehoHearAboutUs,
-      flag,
-    });
-
-    if (!shopifyOrder) {
-      await sendErrorLog({
-        source: "shopify-app",
-        module: "order-action",
-        stage: "shopify_create",
-        level: "error",
-        message: "Shopify order creation returned empty",
-        context: { email, productId, flag, isRenewal },
-        externalService: {
-          name: "shopify",
-          endpoint: "CreateOrderREST",
-          method: "POST",
-        },
-      });
-      return { success: false, message: "Shopify order creation failed" };
-    }
-
-    // 2) Save / update order in Node backend
     const { data } = await axios.post(`${baseURL}/order`, {
       orderId,
       firstName,
@@ -158,6 +117,47 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         message: data?.message || "Order creation failed",
       };
     }
+    // 1) Create the real Shopify order FIRST (both first-time and renewal)
+    const shopifyOrder = await CreateOrderREST({
+      accessToken,
+      shop,
+      apiVersion: "2025-10",
+      firstName,
+      lastName,
+      streetAddress,
+      streetAddress2,
+      age,
+      gender,
+      identity,
+      household_size,
+      ethnicity,
+      household_language,
+      identifyAsLGBTQ,
+      postCode,
+      email,
+      productId,
+      wehoHearAboutUs,
+      flag,
+    });
+
+    if (!shopifyOrder) {
+      await sendErrorLog({
+        source: "shopify-app",
+        module: "order-action",
+        stage: "shopify_create",
+        level: "error",
+        message: "Shopify order creation returned empty",
+        context: { email, productId, flag, isRenewal },
+        externalService: {
+          name: "shopify",
+          endpoint: "CreateOrderREST",
+          method: "POST",
+        },
+      });
+      return { success: false, message: "Shopify order creation failed" };
+    }
+
+    // 2) Save / update order in Node backend
 
     return { success: true, order: shopifyOrder };
   } catch (error: any) {
