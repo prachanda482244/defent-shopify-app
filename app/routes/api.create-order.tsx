@@ -71,7 +71,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       wehoHearAboutUs,
     } = {},
   } = payload;
-
+  console.log({ payload });
   try {
     const { data } = await axios.post(`${baseURL}/order`, {
       orderId,
