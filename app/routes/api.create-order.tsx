@@ -95,6 +95,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       isRenewal,
     });
 
+    console.log("Backend response:", data);
     if (data?.statusCode !== 200 || !data?.success) {
       console.error("Backend returned failure:", data);
       await sendErrorLog({
