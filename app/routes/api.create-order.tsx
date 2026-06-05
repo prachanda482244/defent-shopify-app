@@ -71,7 +71,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       wehoHearAboutUs,
     } = {},
   } = payload;
-  console.log({ payload });
   try {
     const { data } = await axios.post(`${baseURL}/order`, {
       orderId,
@@ -95,7 +94,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       isRenewal,
     });
 
-    console.log("Backend response:", data);
     if (data?.statusCode !== 200 || !data?.success) {
       console.error("Backend returned failure:", data);
       await sendErrorLog({
@@ -119,48 +117,48 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
     // 1) Create the real Shopify order FIRST (both first-time and renewal)
-    // const shopifyOrder = await CreateOrderREST({
-    //   accessToken,
-    //   shop,
-    //   apiVersion: "2025-10",
-    //   firstName,
-    //   lastName,
-    //   streetAddress,
-    //   streetAddress2,
-    //   age,
-    //   gender,
-    //   identity,
-    //   household_size,
-    //   ethnicity,
-    //   household_language,
-    //   identifyAsLGBTQ,
-    //   postCode,
-    //   email,
-    //   productId,
-    //   wehoHearAboutUs,
-    //   flag,
-    // });
+    const shopifyOrder = await CreateOrderREST({
+      accessToken,
+      shop,
+      apiVersion: "2025-10",
+      firstName,
+      lastName,
+      streetAddress,
+      streetAddress2,
+      age,
+      gender,
+      identity,
+      household_size,
+      ethnicity,
+      household_language,
+      identifyAsLGBTQ,
+      postCode,
+      email,
+      productId,
+      wehoHearAboutUs,
+      flag,
+    });
 
-    // if (!shopifyOrder) {
-    //   await sendErrorLog({
-    //     source: "shopify-app",
-    //     module: "order-action",
-    //     stage: "shopify_create",
-    //     level: "error",
-    //     message: "Shopify order creation returned empty",
-    //     context: { email, productId, flag, isRenewal },
-    //     externalService: {
-    //       name: "shopify",
-    //       endpoint: "CreateOrderREST",
-    //       method: "POST",
-    //     },
-    //   });
-    //   return { success: false, message: "Shopify order creation failed" };
-    // }
+    if (!shopifyOrder) {
+      await sendErrorLog({
+        source: "shopify-app",
+        module: "order-action",
+        stage: "shopify_create",
+        level: "error",
+        message: "Shopify order creation returned empty",
+        context: { email, productId, flag, isRenewal },
+        externalService: {
+          name: "shopify",
+          endpoint: "CreateOrderREST",
+          method: "POST",
+        },
+      });
+      return { success: false, message: "Shopify order creation failed" };
+    }
 
     // 2) Save / update order in Node backend
 
-    return { success: true, order: "shopifyOrder" };
+    return { success: true, order: shopifyOrder };
   } catch (error: any) {
     const errorInfo = {
       date: new Date().toISOString(),
