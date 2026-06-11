@@ -26,6 +26,7 @@ export default function App() {
         </Link>
         <Link to="/app/subscription">Subscription</Link>
         <Link to="/app/logs">Logs</Link>
+        <Link to="/app/synced-status">Sync Status</Link>
         {/* <Link to="/app/test">Test</Link> */}
       </NavMenu>
       <Outlet />
