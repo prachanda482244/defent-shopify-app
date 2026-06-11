@@ -22,8 +22,8 @@ import {
  *  any step leaves a retryable state — nothing is silently lost.
  * ------------------------------------------------------------------ */
 
-// const SHOP = "defent.myshopify.com";
-const SHOP = "prachanda-test.myshopify.com";
+const SHOP = "defent.myshopify.com";
+// const SHOP = "prachanda-test.myshopify.com";
 const API_VERSION = "2025-10";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -99,7 +99,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     streetAddress2: streetAddress2 || "",
     postCode,
     email,
-    productId: "gid://shopify/Product/8518918963372",
+    productId,
     flag,
     age,
     gender,
@@ -175,7 +175,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       postCode,
       subscription,
       email,
-      productId: "gid://shopify/Product/8518918963372",
+      productId,
       age,
       gender,
       identity,
@@ -199,7 +199,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         statusCode: data?.statusCode,
         context: {
           email,
-          productId: "gid://shopify/Product/8518918963372",
+          productId,
           flag,
           isRenewal,
         },
@@ -254,7 +254,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         context: {
           orderId: realOrderId,
           email,
-          productId: "gid://shopify/Product/8518918963372",
+          productId,
           flag,
           isRenewal,
         },
@@ -280,7 +280,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       stack: error?.stack,
       context: {
         email,
-        productId: "gid://shopify/Product/8518918963372",
+        productId,
         flag,
         isRenewal,
       },
