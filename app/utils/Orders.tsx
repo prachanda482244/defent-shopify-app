@@ -1,5 +1,48 @@
 import axios from "axios";
 
+/* ================================================================== *
+ *  Orders.tsx
+ *
+ *  ⚠⚠  THIS FILE CONTAINED THE DUPLICATE-ORDER BUG.  ⚠⚠
+ *
+ *  shopifyClient.ts does this:
+ *      const tag = `dbid:${orderId};cycle:${cycle}`;
+ *      return CreateOrderREST({ ...input, tags: tag });
+ *
+ *  ...and the OLD CreateOrderREST destructured its args and never read
+ *  `tags`. It then built its own:
+ *      const orderTag = getOrderTag(flag);      // -> "WEHO" | "LA"
+ *      tags: orderTag
+ *
+ *  So the `dbid:` idempotency tag was NEVER written to Shopify. Which
+ *  means findShopifyOrderByTag() had nothing to find, which means every
+ *  retry after a 429 / timeout created a BRAND NEW ORDER instead of
+ *  recognising the one Shopify had already made. That is your duplicate.
+ *
+ *  FIX: honour the incoming `tags` and MERGE it with the WEHO/LA tag, so
+ *  the store keeps its existing tagging AND we get a stable idempotency
+ *  key on every order. Nothing else about the tags changes.
+ *
+ *  ---- three other things fixed here ----
+ *
+ *  (2) 9 API CALLS PER ORDER -> 1.
+ *      The old code created the order (1 POST), then looped 8 metafields
+ *      with a POST each. Shopify REST is a leaky bucket: ~2 req/sec, 40
+ *      burst. At 9 calls/order the bucket is empty after ~4 orders and
+ *      everything after that 429s. Shopify's Order resource accepts
+ *      metafields INLINE on create, so we now send them with the order.
+ *      (With an automatic fallback to the old loop — see below — so this
+ *      can never make an order fail that used to succeed.)
+ *
+ *  (3) LA ORDERS SHIPPED TO THE WRONG CITY.
+ *      `city: "West Hollywood."` was hardcoded (trailing full-stop and
+ *      all) for EVERY order, including Defent LA. Now derived from flag.
+ *
+ *  (4) TIMEOUT 20s -> 30s. A 20s timeout on order create is how you get
+ *      "Shopify made the order but we never heard back", i.e. the exact
+ *      state that used to duplicate.
+ * ================================================================== */
+
 type CreateOrderRestArgs = {
   shop: string;
   accessToken: string;
@@ -8,19 +51,20 @@ type CreateOrderRestArgs = {
   lastName: string;
   streetAddress: string;
   streetAddress2?: string;
-  // e.g. "US"
   postCode: string;
   email: string;
-  age: string;
-  gender: string;
-  identity: string;
-  household_size: string;
-  identifyAsLGBTQ: boolean;
-  ethnicity: string[]; // allow multiple
-  household_language: string[]; // allow multiple
-  wehoHearAboutUs: string;
+  age?: string;
+  gender?: string;
+  identity?: string;
+  household_size?: string;
+  identifyAsLGBTQ?: boolean | string;
+  ethnicity?: string[] | string;
+  household_language?: string[] | string;
+  wehoHearAboutUs?: string;
   productId: string;
   flag?: "defentWeho" | "defentLA";
+  /** ++ NOW ACTUALLY USED ++ idempotency tag, e.g. "dbid:<id>;cycle:<c>" */
+  tags?: string;
 };
 
 function getOrderNote(flag?: "defentWeho" | "defentLA") {
@@ -45,6 +89,105 @@ function getOrderTag(flag?: "defentWeho" | "defentLA"): string {
   }
 }
 
+/** City must follow the flag, not be hardcoded to WeHo. */
+function getCity(flag?: "defentWeho" | "defentLA"): string {
+  return flag === "defentLA" ? "Los Angeles" : "West Hollywood";
+}
+
+/**
+ * Merge the site tag (WEHO / LA) with the idempotency tag(s).
+ *
+ * Shopify treats `tags` as a comma-separated string, and our idempotency
+ * tag internally uses ';' as its own separator ("dbid:x;cycle:y") — that
+ * would be ONE tag containing a semicolon, which is legal but not
+ * searchable per-part. So we split it into separate comma tags:
+ *     "WEHO, dbid:68f..., cycle:2026-07-01"
+ * Now `tag:'dbid:68f...'` is an exact, indexable match in GraphQL.
+ */
+function buildTags(flag: CreateOrderRestArgs["flag"], extra?: string): string {
+  const parts: string[] = [];
+  const site = getOrderTag(flag);
+  if (site) parts.push(site);
+
+  if (extra) {
+    for (const raw of extra.split(";")) {
+      const t = raw.trim();
+      if (t) parts.push(t);
+    }
+  }
+  // de-dupe, preserve order
+  return Array.from(new Set(parts)).join(", ");
+}
+
+/** Shopify metafield `value` must be a string. */
+function toJsonValue(v: string[] | string | undefined): string {
+  if (Array.isArray(v)) return JSON.stringify(v.filter(Boolean));
+  if (typeof v === "string" && v.length) {
+    // The Node backend joins multi-selects into "A, B" before sending.
+    // Split it back out so the metafield stays a real JSON array.
+    return JSON.stringify(
+      v
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
+  return JSON.stringify([]);
+}
+
+function buildMetafields(args: CreateOrderRestArgs) {
+  const {
+    age,
+    gender,
+    identity,
+    household_size,
+    identifyAsLGBTQ,
+    wehoHearAboutUs,
+    ethnicity,
+    household_language,
+  } = args;
+
+  const lgbtq =
+    typeof identifyAsLGBTQ === "string"
+      ? identifyAsLGBTQ
+      : identifyAsLGBTQ
+        ? "Yes"
+        : "No";
+
+  return (
+    [
+      { key: "age", type: "single_line_text_field", value: age || "" },
+      { key: "gender", type: "single_line_text_field", value: gender || "" },
+      {
+        key: "identity",
+        type: "single_line_text_field",
+        value: identity || "",
+      },
+      {
+        key: "household_size",
+        type: "single_line_text_field",
+        value: household_size || "",
+      },
+      { key: "identifyAsLGBTQ", type: "single_line_text_field", value: lgbtq },
+      {
+        key: "wehoHearAboutUs",
+        type: "single_line_text_field",
+        value: wehoHearAboutUs || "",
+      },
+      { key: "ethnicity", type: "json", value: toJsonValue(ethnicity) },
+      {
+        key: "household_language",
+        type: "json",
+        value: toJsonValue(household_language),
+      },
+    ]
+      // Shopify rejects a metafield with an empty value — drop them instead
+      // of letting one blank demographic field 422 the whole order.
+      .filter((m) => m.value !== "" && m.value !== undefined)
+      .map((m) => ({ namespace: "demographics", ...m }))
+  );
+}
+
 export async function CreateOrderREST(args: CreateOrderRestArgs) {
   const {
     shop,
@@ -57,15 +200,8 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     postCode,
     email,
     productId,
-    age,
-    gender,
-    identity,
-    household_size,
-    ethnicity,
-    identifyAsLGBTQ,
-    wehoHearAboutUs,
-    household_language,
     flag,
+    tags, // ++ the idempotency tag from shopifyClient.ts ++
   } = args;
 
   if (!shop || !accessToken) throw new Error("shop and accessToken required");
@@ -79,7 +215,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    timeout: 20000,
+    timeout: 30000, // was 20s — see note (4) at the top of this file
   });
 
   try {
@@ -113,86 +249,72 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       address2: streetAddress2,
       country: "United States",
       zip: postCode,
-      city: "West Hollywood.",
+      city: getCity(flag), // ++ was hardcoded "West Hollywood." ++
       province: "California",
       country_code: "US",
       province_code: "CA",
     };
 
-    const orderNote = getOrderNote(flag);
-    const orderTag = getOrderTag(flag);
-    const payload = {
-      order: {
-        email,
-        note: orderNote,
-        tags: orderTag,
-        line_items: [{ variant_id: variantId, quantity: 1 }],
-        shipping_address: addr,
-        billing_address: addr,
-        customer: { first_name: firstName, last_name: lastName, email },
-      },
+    const orderTags = buildTags(flag, tags); // ++ THE FIX ++
+    const metafields = buildMetafields(args);
+
+    const orderBody: Record<string, unknown> = {
+      email,
+      note: getOrderNote(flag),
+      tags: orderTags,
+      line_items: [{ variant_id: variantId, quantity: 1 }],
+      shipping_address: addr,
+      billing_address: addr,
+      customer: { first_name: firstName, last_name: lastName, email },
     };
 
     // ----------------------------
-    // 3. Create order on Shopify
+    // 3. Create order on Shopify (metafields INLINE -> 1 call, not 9)
     // ----------------------------
-    const res = await client.post("/orders.json", payload);
-    console.log("Order created:", res.data.order?.id);
-
-    const order = res.data.order as { id: number };
-
-    // ----------------------------
-    // 4. Save metafields (optional)
-    // ----------------------------
+    let res;
     try {
-      const metas = [
-        { key: "age", type: "single_line_text_field", value: age },
-        { key: "gender", type: "single_line_text_field", value: gender },
-        { key: "identity", type: "single_line_text_field", value: identity },
-        {
-          key: "household_size",
-          type: "single_line_text_field",
-          value: household_size,
-        },
-        {
-          key: "identifyAsLGBTQ",
-          type: "single_line_text_field",
-          value: identifyAsLGBTQ ? "Yes" : "No",
-        },
-        {
-          key: "wehoHearAboutUs",
-          type: "single_line_text_field",
-          value: wehoHearAboutUs,
-        },
+      res = await client.post("/orders.json", {
+        order: { ...orderBody, metafields },
+      });
+    } catch (err: any) {
+      /* SAFETY NET: inline metafields turn a metafield validation error
+         into an order-create failure, where the old code just swallowed it.
+         So if the create 422s, retry WITHOUT metafields and fall back to
+         the original write-them-afterwards loop. Net effect: we can never
+         fail an order that used to succeed. */
+      const status = err?.response?.status;
+      const isValidation = status === 422 || status === 400;
+      if (!isValidation || !metafields.length) throw err;
 
-        {
-          key: "ethnicity",
-          type: "json",
-          value: JSON.stringify(ethnicity || []),
-        },
-        {
-          key: "household_language",
-          type: "json",
-          value: JSON.stringify(household_language || []),
-        },
-      ];
+      console.warn(
+        "[CreateOrderREST] inline metafields rejected — retrying without them",
+        err?.response?.data,
+      );
+      res = await client.post("/orders.json", { order: orderBody });
 
-      for (const m of metas) {
-        await client.post(`/orders/${order.id}/metafields.json`, {
-          metafield: { namespace: "demographics", ...m },
+      const created = res.data.order as { id: number };
+      try {
+        for (const m of metafields) {
+          await client.post(`/orders/${created.id}/metafields.json`, {
+            metafield: m,
+          });
+        }
+      } catch (metaErr: any) {
+        // Same as the original: metafields are nice-to-have, not fatal.
+        console.error("Metafield write failed:", {
+          message: metaErr?.message,
+          response: metaErr?.response?.data,
         });
       }
-    } catch (metaErr: any) {
-      console.error("Metafield write failed:", {
-        message: metaErr?.message,
-        response: metaErr?.response?.data,
-      });
     }
+
+    const order = res.data.order as { id: number; tags?: string };
+    console.log("Order created:", order?.id, "tags:", orderTags);
 
     return { success: true, order: res.data.order };
   } catch (error: any) {
     // ----------------------------
-    // 5. Structured error logging
+    // 4. Structured error logging
     // ----------------------------
     const log = {
       date: new Date().toISOString(),
@@ -206,11 +328,21 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
 
     console.error("CreateOrderREST FAILED:", log);
 
-    throw new Error(
+    /* IMPORTANT: preserve the original error object's `response` so the
+       caller's is429() check still works. The old code threw a bare
+       `new Error(msg)`, which DESTROYED err.response — meaning
+       shopifyClient's `is429(err)` was always false and the 429 retry
+       logic in createShopifyOrder() never actually fired. */
+    const wrapped: any = new Error(
       error?.response?.data?.error ||
+        error?.response?.data?.errors ||
         error?.response?.data?.message ||
         error?.message ||
         "Shopify order creation failed",
     );
+    wrapped.response = error?.response;
+    wrapped.status = error?.response?.status;
+    wrapped.code = error?.code;
+    throw wrapped;
   }
 }
