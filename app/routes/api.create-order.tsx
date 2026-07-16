@@ -195,6 +195,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     shopifyOrderId: string | null,
     cyc?: string,
     error = "",
+    orderName: string | null = null, // Shopify's human number, e.g. "#4232"
   ) => {
     await axios.post(`${baseURL}/order/confirm`, {
       orderId: id,
@@ -202,6 +203,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       isRenewal,
       status,
       shopifyOrderId,
+      orderName,
       error,
     });
   };
@@ -228,7 +230,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
         const newId =
           created?.id?.toString?.() || created?.order?.id?.toString?.() || null;
-        await confirm(orderId, "synced", newId, cycle);
+        const newName = created?.order?.name || created?.name || null;
+        await confirm(orderId, "synced", newId, cycle, "", newName);
         return { success: true, retried: true, shopifyOrderId: newId };
       } catch (e: any) {
         await confirm(orderId, "failed", null, cycle, e?.message);
@@ -336,8 +339,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
       const shopifyOrderId =
         created?.id?.toString?.() || created?.order?.id?.toString?.() || null;
+      const shopifyOrderName = created?.order?.name || created?.name || null;
 
-      await confirm(realOrderId, "synced", shopifyOrderId, realCycle);
+      await confirm(
+        realOrderId,
+        "synced",
+        shopifyOrderId,
+        realCycle,
+        "",
+        shopifyOrderName,
+      );
       return { success: true, shopifyOrderId };
     } catch (e: any) {
       /* Shopify failed -> mark retryable.
