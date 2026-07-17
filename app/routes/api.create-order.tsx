@@ -1,6 +1,6 @@
 import { ActionFunctionArgs } from "@remix-run/node";
 import axios from "axios";
-import { accessToken } from "app/constant";
+import { accessToken, INTERNAL_API_KEY } from "app/constant";
 import {
   createShopifyOrder,
   findShopifyOrderByTag,
@@ -132,6 +132,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       streetAddress: db.streetAddress,
       streetAddress2: db.streetAddress2 || "",
       postCode: db.postCode,
+      mailingCity: db.mailingCity || "", // true USPS city (spec 4b)
       email: db.email,
       productId: db.productId, // <- the subscribed product
       flag: db.source === "Defent La" ? "defentLA" : "defentWeho",
@@ -197,15 +198,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     error = "",
     orderName: string | null = null, // Shopify's human number, e.g. "#4232"
   ) => {
-    await axios.post(`${baseURL}/order/confirm`, {
-      orderId: id,
-      cycle: cyc,
-      isRenewal,
-      status,
-      shopifyOrderId,
-      orderName,
-      error,
-    });
+    await axios.post(
+      `${baseURL}/order/confirm`,
+      {
+        orderId: id,
+        cycle: cyc,
+        isRenewal,
+        status,
+        shopifyOrderId,
+        orderName,
+        error,
+      },
+      {
+        headers: { "x-internal-key": INTERNAL_API_KEY || "" },
+      },
+    );
   };
 
   try {

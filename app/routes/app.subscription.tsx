@@ -16,9 +16,10 @@ import {
   Divider,
   Box,
   Grid,
-  Card,
   Avatar,
   Icon,
+  TextField,
+  Banner,
 } from "@shopify/polaris";
 import {
   ViewIcon,
@@ -26,8 +27,8 @@ import {
   MegaphoneIcon,
   CalendarIcon,
   ProductIcon,
-  TaxIcon,
   ProfileIcon,
+  SearchIcon,
 } from "@shopify/polaris-icons";
 
 type Demographics = {
@@ -60,6 +61,18 @@ type Item = {
   productId?: string;
   flag?: string;
   demographics?: Demographics;
+  mailingCity?: string;
+};
+
+type Verdict = {
+  eligible: boolean;
+  program?: string;
+  municipality?: string;
+  mailingCity?: string;
+  message?: string;
+  transient?: boolean;
+  typedZip?: string;
+  matchedZip?: string;
 };
 
 type OrdersResponse = {
@@ -86,8 +99,29 @@ const fmt = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-const addDays = (d: Date, n: number) =>
-  new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
+/* ++ QUARTERLY ++  Next shipment mirrors the backend rule: +3 calendar
+   months, rounded UP to the 1st of the following month unless it already
+   lands on a 1st. Display-only; backend cycle.js is the source of truth. */
+const RECURRING = ["monthly", "quarterly", "recurring"];
+const isRecurring = (s?: string) => RECURRING.includes(String(s || ""));
+const subLabel = (s?: string) =>
+  isRecurring(s) ? "Quarterly" : s === "one_time" ? "One-time" : s || "—";
+
+function nextShipment(last?: string | null): Date | null {
+  if (!last) return null;
+  const d = new Date(last);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = d.getUTCDate();
+  const base = new Date(d);
+  base.setUTCDate(1);
+  base.setUTCMonth(base.getUTCMonth() + 3);
+  const lastDay = new Date(
+    Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  base.setUTCDate(Math.min(day, lastDay));
+  if (base.getUTCDate() === 1) return base;
+  return new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 1));
+}
 
 const Subscription = () => {
   const [items, setItems] = useState<Item[]>([]);
@@ -105,18 +139,24 @@ const Subscription = () => {
   const [target, setTarget] = useState<Item | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
 
+  /* ++ SEARCH ++ name or email; applied server-side. */
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+
+  /* ++ ADDRESS VALIDATION (detail modal) ++ */
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [validating, setValidating] = useState(false);
+
   const load = useCallback(
-    async (p = page, source = sourceFilter) => {
+    async (p = page, source = sourceFilter, q = search) => {
       setLoading(true);
       try {
         const params: any = { page: p, limit };
-        if (source) {
-          params.source = source;
-        }
+        if (source) params.source = source;
+        if (q) params.search = q;
         const { data } = await apiClient.get<OrdersResponse>("/order", {
           params,
         });
-        console.log(data?.data, "data");
         setItems(data?.data?.data ?? []);
         setTotalPages(data?.data?.totalPages ?? 1);
         setTotal(data?.data?.total ?? 0);
@@ -129,13 +169,22 @@ const Subscription = () => {
         setLoading(false);
       }
     },
-    [page, limit, sourceFilter],
+    [page, limit, sourceFilter, search],
   );
 
   useEffect(() => {
-    load(1, sourceFilter);
+    load(1, sourceFilter, search);
     setPage(1);
-  }, [sourceFilter]);
+  }, [sourceFilter, search]);
+
+  const runSearch = useCallback(
+    () => setSearch(searchInput.trim()),
+    [searchInput],
+  );
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setSearch("");
+  }, []);
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(items, { resourceIDResolver: (i) => i._id });
@@ -147,6 +196,7 @@ const Subscription = () => {
 
   const showDetails = useCallback((item: Item) => {
     setTarget(item);
+    setVerdict(null);
     setDetailModalOpen(true);
   }, []);
 
@@ -155,21 +205,54 @@ const Subscription = () => {
     setActionBusy(target._id);
     try {
       await apiClient.put(`/order/${target._id}`, { isActive: false });
-      await load(page, sourceFilter);
+      await load(page, sourceFilter, search);
       selectedResources.length = 0;
     } finally {
       setActionBusy(null);
       setTarget(null);
       setModalOpen(false);
     }
-  }, [target, load, page, sourceFilter, selectedResources.length]);
+  }, [target, load, page, sourceFilter, search, selectedResources.length]);
+
+  const validateTargetAddress = useCallback(async () => {
+    if (!target) return;
+    setValidating(true);
+    setVerdict(null);
+    try {
+      const flag =
+        target.flag ||
+        (String(target.source || "")
+          .toLowerCase()
+          .includes("la")
+          ? "defentLA"
+          : "defentWeho");
+      const { data } = await apiClient.post("/order/validate-address", {
+        streetAddress: target.streetAddress,
+        streetAddress2: target.streetAddress2 || "",
+        postCode: target.postCode || "",
+        flag,
+      });
+      setVerdict(data?.data ?? { eligible: false, message: data?.message });
+    } catch (e: any) {
+      setVerdict({
+        eligible: false,
+        transient: true,
+        message:
+          e?.response?.status === 429
+            ? "Too many checks — wait a few minutes and try again."
+            : "Validation service unreachable.",
+      });
+    } finally {
+      setValidating(false);
+    }
+  }, [target]);
 
   const handlePageChange = useCallback(
     (newPage: number) => {
       setPage(newPage);
-      load(newPage, sourceFilter);
+      load(newPage, sourceFilter, search);
     },
-    [load, sourceFilter],
+    [load, sourceFilter, search],
   );
 
   const headings = useMemo(
@@ -179,8 +262,8 @@ const Subscription = () => {
       { title: "Active" },
       { title: "Street address" },
       { title: "Source" },
-      { title: "Created at" },
-      { title: "Next order" },
+      { title: "Last order" },
+      { title: "Next shipment" },
       { title: "Actions" },
     ],
     [],
@@ -195,24 +278,49 @@ const Subscription = () => {
   return (
     <Page
       title="Subscription Management"
-      subtitle="Customers with orders in the past 30 days"
+      subtitle={
+        search
+          ? `Search results for "${search}" (all time)`
+          : "Customers with orders in the past 30 days"
+      }
     >
       <LegacyCard>
         <div style={{ padding: "16px", borderBottom: "1px solid #e1e1e1" }}>
-          <InlineStack gap="400" align="space-between" blockAlign="center">
-            <div style={{ minWidth: "200px" }}>
-              <Select
-                label="Filter by source"
-                labelHidden
-                options={sourceOptions}
-                value={sourceFilter}
-                onChange={(value) => setSourceFilter(value)}
-                placeholder="Select source"
-              />
-            </div>
-            {filteredBy && (
+          <InlineStack gap="400" align="space-between" blockAlign="end" wrap>
+            <InlineStack gap="300" blockAlign="end">
+              <div style={{ minWidth: "260px" }}>
+                <TextField
+                  label="Search"
+                  labelHidden
+                  value={searchInput}
+                  onChange={setSearchInput}
+                  autoComplete="off"
+                  placeholder="Search name or email…"
+                  prefix={<Icon source={SearchIcon} tone="base" />}
+                  clearButton
+                  onClearButtonClick={clearSearch}
+                />
+              </div>
+              <Button
+                onClick={runSearch}
+                disabled={!searchInput.trim() && !search}
+              >
+                Search
+              </Button>
+              <div style={{ minWidth: "200px" }}>
+                <Select
+                  label="Filter by source"
+                  labelHidden
+                  options={sourceOptions}
+                  value={sourceFilter}
+                  onChange={(value) => setSourceFilter(value)}
+                  placeholder="Select source"
+                />
+              </div>
+            </InlineStack>
+            {(filteredBy || search) && (
               <Badge tone="info">
-                Filtered: {filteredBy} ({total as any} orders)
+                {`${filteredBy ? `Filtered: ${filteredBy}` : "All sources"}${search ? ` · "${search}"` : ""} (${total} orders)`}
               </Badge>
             )}
           </InlineStack>
@@ -231,16 +339,22 @@ const Subscription = () => {
           emptyState={
             <BlockStack inlineAlign="center" gap="200">
               <Text as="p" tone="subdued">
-                No subscriptions found.
+                {search
+                  ? `No customers match "${search}".`
+                  : "No subscriptions found."}
               </Text>
             </BlockStack>
           }
         >
           {items?.map((item, index) => {
-            const createdAt = item.lastRenewAt
+            const lastOrder = item.lastRenewAt
               ? new Date(item.lastRenewAt)
               : null;
-            const nextOrder = createdAt ? addDays(createdAt, 30) : null;
+            const recurringActive =
+              isRecurring(item.subscription) && item.isActive;
+            const nextOrder = recurringActive
+              ? nextShipment(item.lastRenewAt)
+              : null;
             const name =
               `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() || "—";
             return (
@@ -264,10 +378,10 @@ const Subscription = () => {
                 <IndexTable.Cell>
                   <Badge
                     tone={
-                      item.subscription === "monthly" ? "success" : "attention"
+                      isRecurring(item.subscription) ? "success" : "attention"
                     }
                   >
-                    {item.subscription || "—"}
+                    {subLabel(item.subscription)}
                   </Badge>
                 </IndexTable.Cell>
 
@@ -305,7 +419,7 @@ const Subscription = () => {
 
                 <IndexTable.Cell>
                   <Text as="span" variant="bodyMd">
-                    {createdAt ? fmt.format(createdAt) : "—"}
+                    {lastOrder ? fmt.format(lastOrder) : "—"}
                   </Text>
                 </IndexTable.Cell>
 
@@ -369,18 +483,20 @@ const Subscription = () => {
           { content: "Close", onAction: () => setModalOpen(false) },
         ]}
       >
-        <BlockStack gap="200">
-          <Text as="p">
-            This stops future renewals for{" "}
-            <Text as="span" fontWeight="semibold">
-              {target ? `${target.firstName} ${target.lastName}` : ""}
+        <Modal.Section>
+          <BlockStack gap="200">
+            <Text as="p">
+              This stops future quarterly shipments for{" "}
+              <Text as="span" fontWeight="semibold">
+                {target ? `${target.firstName} ${target.lastName}` : ""}
+              </Text>
+              . Any order already created still ships.
             </Text>
-            .
-          </Text>
-        </BlockStack>
+          </BlockStack>
+        </Modal.Section>
       </Modal>
 
-      {/* Improved Detail Modal */}
+      {/* Detail Modal — redesigned: left-aligned headers, uniform tiles */}
       <Modal
         open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
@@ -394,21 +510,24 @@ const Subscription = () => {
         {target && (
           <Box padding="400">
             <BlockStack gap="500">
-              {/* Header with Avatar and Name */}
+              {/* Header */}
               <Box
                 padding="400"
                 background="bg-surface-secondary"
-                borderRadius="200"
+                borderRadius="300"
               >
-                <InlineStack gap="400" align="center" wrap={false}>
+                <InlineStack gap="400" blockAlign="center" wrap={false}>
                   <Avatar
                     size="lg"
                     name={`${target.firstName} ${target.lastName}`}
                     source={undefined}
                   />
-                  <BlockStack gap="100">
+                  <BlockStack gap="150">
                     <Text as="h2" variant="headingLg" fontWeight="bold">
                       {target.firstName} {target.lastName}
+                    </Text>
+                    <Text as="p" tone="subdued">
+                      {target.email}
                     </Text>
                     <InlineStack gap="200">
                       <Badge tone={target.isActive ? "success" : "critical"}>
@@ -416,12 +535,12 @@ const Subscription = () => {
                       </Badge>
                       <Badge
                         tone={
-                          target.subscription === "monthly"
+                          isRecurring(target.subscription)
                             ? "success"
                             : "attention"
                         }
                       >
-                        {target.subscription}
+                        {subLabel(target.subscription)}
                       </Badge>
                       <Badge
                         tone={
@@ -435,344 +554,268 @@ const Subscription = () => {
                 </InlineStack>
               </Box>
 
-              {/* Contact Information */}
-              <Box>
-                <InlineStack gap="200" align="center">
-                  <Icon source={EmailIcon} tone="base" />
-                  <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    Contact Information
-                  </Text>
-                </InlineStack>
-                <Divider />
-                <Box paddingBlockStart="300">
-                  <BlockStack gap="200">
-                    <InlineStack gap="400" wrap>
-                      <Box
-                        padding="200"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                      >
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          Email Address
-                        </Text>
-                        <Text as="p" variant="bodyMd" fontWeight="medium">
-                          {target.email}
-                        </Text>
-                      </Box>
-                      <Box
-                        padding="200"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                      >
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          Customer ID
-                        </Text>
-                        <Text as="p" variant="bodyMd" fontWeight="medium">
-                          {target._id.slice(-8)}
-                        </Text>
-                      </Box>
-                    </InlineStack>
-                  </BlockStack>
-                </Box>
-              </Box>
-
-              {/* Address Information */}
-              <Box>
-                <InlineStack gap="200" align="center">
+              {/* Address */}
+              <BlockStack gap="300">
+                <InlineStack gap="150" blockAlign="center">
                   <Icon source={MegaphoneIcon} tone="base" />
                   <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    Address Information
+                    Address
                   </Text>
                 </InlineStack>
                 <Divider />
-                <Box paddingBlockStart="300">
-                  <Grid columns={{ sm: 2 }}>
-                    <Grid.Cell>
-                      <Box
-                        padding="200"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                      >
+                <Grid columns={{ xs: 1, sm: 2 }}>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 3 }}>
+                    <Box
+                      padding="300"
+                      background="bg-surface-secondary"
+                      borderRadius="200"
+                      minHeight="100%"
+                    >
+                      <BlockStack gap="100">
                         <Text as="p" tone="subdued" variant="bodySm">
-                          Street Address
+                          Street address
                         </Text>
                         <Text as="p" variant="bodyMd" fontWeight="medium">
-                          {target.streetAddress}
+                          {[target.streetAddress, target.streetAddress2]
+                            .filter(Boolean)
+                            .join(", ")}
                         </Text>
-                        {target.streetAddress2 && (
-                          <Text as="p" variant="bodyMd">
-                            {target.streetAddress2}
-                          </Text>
-                        )}
                         <Text as="p" variant="bodyMd">
-                          {target.postCode}
+                          {[target.mailingCity, target.postCode]
+                            .filter(Boolean)
+                            .join(", ") || "—"}
                         </Text>
-                      </Box>
-                    </Grid.Cell>
-                    {target.normalizedAddress && (
-                      <Grid.Cell>
-                        <Box
-                          padding="200"
-                          background="bg-surface-secondary"
-                          borderRadius="200"
-                        >
-                          <Text as="p" tone="subdued" variant="bodySm">
-                            Normalized Address
-                          </Text>
-                          <Text as="p" variant="bodyMd">
-                            {target.normalizedAddress}
-                          </Text>
-                          {target.normalizedAddress2 && (
-                            <Text as="p" variant="bodyMd">
-                              {target.normalizedAddress2}
-                            </Text>
-                          )}
-                        </Box>
-                      </Grid.Cell>
-                    )}
-                  </Grid>
-                </Box>
-              </Box>
-
-              {/* Demographics Section */}
-              {target.demographics &&
-                Object.keys(target.demographics).some(
-                  (key) => target.demographics?.[key as keyof Demographics],
-                ) && (
-                  <Box>
-                    <InlineStack gap="200" align="center">
-                      <Icon source={ProfileIcon} tone="base" />
-                      <Text as="h3" variant="headingMd" fontWeight="semibold">
-                        Demographics
-                      </Text>
-                    </InlineStack>
-                    <Divider />
-                    <Box paddingBlockStart="300">
-                      <Grid columns={{ sm: 2, md: 3, lg: 4 }}>
-                        {target.demographics.age && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                Age
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.age}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.gender && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                Gender
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.gender}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.identity && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                Identity
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.identity}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.household_size && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                Household Size
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.household_size}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.ethnicity && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                Ethnicity
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.ethnicity}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.household_language && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                Language
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.household_language}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.identifyAsLGBTQ && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                LGBTQ+
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.identifyAsLGBTQ}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                        {target.demographics.wehoHearAboutUs && (
-                          <Grid.Cell>
-                            <Box
-                              padding="200"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <Text as="p" tone="subdued" variant="bodySm">
-                                How They Heard
-                              </Text>
-                              <Text as="p" variant="bodyMd" fontWeight="medium">
-                                {target.demographics.wehoHearAboutUs}
-                              </Text>
-                            </Box>
-                          </Grid.Cell>
-                        )}
-                      </Grid>
+                      </BlockStack>
                     </Box>
-                  </Box>
-                )}
+                  </Grid.Cell>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 3 }}>
+                    <Box
+                      padding="300"
+                      background="bg-surface-secondary"
+                      borderRadius="200"
+                      minHeight="100%"
+                    >
+                      <BlockStack gap="100">
+                        <Text as="p" tone="subdued" variant="bodySm">
+                          Verified as (Census)
+                        </Text>
+                        <Text as="p" variant="bodyMd">
+                          {target.normalizedAddress || "—"}
+                          {target.normalizedAddress2
+                            ? ` · unit ${target.normalizedAddress2}`
+                            : ""}
+                        </Text>
+                      </BlockStack>
+                    </Box>
+                  </Grid.Cell>
+                </Grid>
 
-              {/* Order Information */}
-              <Box>
-                <InlineStack gap="200" align="center">
+                <InlineStack gap="200">
+                  <Button loading={validating} onClick={validateTargetAddress}>
+                    Validate this address now
+                  </Button>
+                </InlineStack>
+                {verdict && (
+                  <Banner
+                    tone={
+                      verdict.eligible
+                        ? "success"
+                        : verdict.transient
+                          ? "warning"
+                          : "critical"
+                    }
+                    title={
+                      verdict.eligible
+                        ? `Valid for ${verdict.program}`
+                        : verdict.transient
+                          ? "Could not verify right now"
+                          : "Address check failed"
+                    }
+                  >
+                    <BlockStack gap="100">
+                      <p>{verdict.message}</p>
+                      {verdict.municipality && (
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Municipality: {verdict.municipality}
+                          {verdict.mailingCity
+                            ? ` · label city: ${verdict.mailingCity}`
+                            : ""}
+                          {verdict.matchedZip
+                            ? ` · ZIP typed ${verdict.typedZip} / Census ${verdict.matchedZip}`
+                            : ""}
+                        </Text>
+                      )}
+                    </BlockStack>
+                  </Banner>
+                )}
+              </BlockStack>
+
+              {/* Schedule */}
+              <BlockStack gap="300">
+                <InlineStack gap="150" blockAlign="center">
                   <Icon source={CalendarIcon} tone="base" />
                   <Text as="h3" variant="headingMd" fontWeight="semibold">
                     Order Timeline
                   </Text>
                 </InlineStack>
                 <Divider />
-                <Box paddingBlockStart="300">
-                  <Grid columns={{ sm: 3 }}>
-                    <Grid.Cell>
+                <Grid columns={{ xs: 1, sm: 3 }}>
+                  {(
+                    [
+                      [
+                        "Created",
+                        target.createdAt
+                          ? fmt.format(new Date(target.createdAt))
+                          : "—",
+                      ],
+                      [
+                        "Last order",
+                        target.lastRenewAt
+                          ? fmt.format(new Date(target.lastRenewAt))
+                          : "—",
+                      ],
+                      [
+                        "Next shipment",
+                        isRecurring(target.subscription) && target.isActive
+                          ? (() => {
+                              const n = nextShipment(target.lastRenewAt);
+                              return n
+                                ? `${fmt.format(n)} (1st of month)`
+                                : "—";
+                            })()
+                          : "— (not recurring)",
+                      ],
+                    ] as [string, string][]
+                  ).map(([label, value]) => (
+                    <Grid.Cell key={label} columnSpan={{ xs: 6, sm: 2 }}>
                       <Box
-                        padding="200"
+                        padding="300"
                         background="bg-surface-secondary"
                         borderRadius="200"
+                        minHeight="100%"
                       >
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          Created At
-                        </Text>
-                        <Text as="p" variant="bodyMd" fontWeight="medium">
-                          {target.createdAt
-                            ? fmt.format(new Date(target.createdAt))
-                            : "—"}
-                        </Text>
+                        <BlockStack gap="100">
+                          <Text as="p" tone="subdued" variant="bodySm">
+                            {label}
+                          </Text>
+                          <Text as="p" variant="bodyMd" fontWeight="medium">
+                            {value}
+                          </Text>
+                        </BlockStack>
                       </Box>
                     </Grid.Cell>
-                    <Grid.Cell>
-                      <Box
-                        padding="200"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                      >
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          Last Renewed
-                        </Text>
-                        <Text as="p" variant="bodyMd" fontWeight="medium">
-                          {target.lastRenewAt
-                            ? fmt.format(new Date(target.lastRenewAt))
-                            : "—"}
-                        </Text>
-                      </Box>
-                    </Grid.Cell>
-                    <Grid.Cell>
-                      <Box
-                        padding="200"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                      >
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          Next Order
-                        </Text>
-                        <Text as="p" variant="bodyMd" fontWeight="medium">
-                          {target.lastRenewAt
-                            ? fmt.format(
-                                addDays(new Date(target.lastRenewAt), 30),
-                              )
-                            : "—"}
-                        </Text>
-                      </Box>
-                    </Grid.Cell>
-                  </Grid>
-                </Box>
-              </Box>
+                  ))}
+                </Grid>
+              </BlockStack>
 
-              {/* Product Information */}
-              {target.productId && (
-                <Box>
-                  <InlineStack gap="200" align="center">
-                    <Icon source={ProductIcon} tone="base" />
-                    <Text as="h3" variant="headingMd" fontWeight="semibold">
-                      Product Information
-                    </Text>
-                  </InlineStack>
-                  <Divider />
-                  <Box paddingBlockStart="300">
+              {/* Demographics */}
+              {target.demographics &&
+                Object.keys(target.demographics).some(
+                  (key) => target.demographics?.[key as keyof Demographics],
+                ) && (
+                  <BlockStack gap="300">
+                    <InlineStack gap="150" blockAlign="center">
+                      <Icon source={ProfileIcon} tone="base" />
+                      <Text as="h3" variant="headingMd" fontWeight="semibold">
+                        Demographics
+                      </Text>
+                    </InlineStack>
+                    <Divider />
+                    <Grid columns={{ xs: 2, sm: 4 }}>
+                      {(
+                        [
+                          ["Age", target.demographics.age],
+                          ["Gender", target.demographics.gender],
+                          ["Identity", target.demographics.identity],
+                          [
+                            "Household size",
+                            target.demographics.household_size,
+                          ],
+                          ["Ethnicity", target.demographics.ethnicity],
+                          ["Language", target.demographics.household_language],
+                          ["LGBTQ+", target.demographics.identifyAsLGBTQ],
+                          [
+                            "Heard about us",
+                            target.demographics.wehoHearAboutUs,
+                          ],
+                        ] as [string, string | undefined][]
+                      )
+                        .filter(([, v]) => v)
+                        .map(([label, value]) => (
+                          <Grid.Cell key={label} columnSpan={{ xs: 3, sm: 2 }}>
+                            <Box
+                              padding="300"
+                              background="bg-surface-secondary"
+                              borderRadius="200"
+                              minHeight="100%"
+                            >
+                              <BlockStack gap="100">
+                                <Text as="p" tone="subdued" variant="bodySm">
+                                  {label}
+                                </Text>
+                                <Text
+                                  as="p"
+                                  variant="bodyMd"
+                                  fontWeight="medium"
+                                >
+                                  {value}
+                                </Text>
+                              </BlockStack>
+                            </Box>
+                          </Grid.Cell>
+                        ))}
+                    </Grid>
+                  </BlockStack>
+                )}
+
+              {/* Reference */}
+              <BlockStack gap="300">
+                <InlineStack gap="150" blockAlign="center">
+                  <Icon source={ProductIcon} tone="base" />
+                  <Text as="h3" variant="headingMd" fontWeight="semibold">
+                    Reference
+                  </Text>
+                </InlineStack>
+                <Divider />
+                <Grid columns={{ xs: 1, sm: 2 }}>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 3 }}>
                     <Box
-                      padding="200"
+                      padding="300"
                       background="bg-surface-secondary"
                       borderRadius="200"
+                      minHeight="100%"
                     >
-                      <Text as="p" tone="subdued" variant="bodySm">
-                        Product ID
-                      </Text>
-                      <Text as="p" variant="bodyMd" fontWeight="medium">
-                        {target.productId}
-                      </Text>
+                      <BlockStack gap="100">
+                        <Text as="p" tone="subdued" variant="bodySm">
+                          Customer ID
+                        </Text>
+                        <Text as="p" variant="bodyMd" fontWeight="medium">
+                          {target._id}
+                        </Text>
+                      </BlockStack>
                     </Box>
-                  </Box>
-                </Box>
-              )}
+                  </Grid.Cell>
+                  {target.productId && (
+                    <Grid.Cell columnSpan={{ xs: 6, sm: 3 }}>
+                      <Box
+                        padding="300"
+                        background="bg-surface-secondary"
+                        borderRadius="200"
+                        minHeight="100%"
+                      >
+                        <BlockStack gap="100">
+                          <Text as="p" tone="subdued" variant="bodySm">
+                            Product ID
+                          </Text>
+                          <Text as="p" variant="bodyMd" fontWeight="medium">
+                            {target.productId}
+                          </Text>
+                        </BlockStack>
+                      </Box>
+                    </Grid.Cell>
+                  )}
+                </Grid>
+              </BlockStack>
             </BlockStack>
           </Box>
         )}

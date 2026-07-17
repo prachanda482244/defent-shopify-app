@@ -52,6 +52,7 @@ type CreateOrderRestArgs = {
   streetAddress: string;
   streetAddress2?: string;
   postCode: string;
+  mailingCity?: string; // true USPS city from the backend (spec 4b)
   email: string;
   age?: string;
   gender?: string;
@@ -200,6 +201,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     postCode,
     email,
     productId,
+    mailingCity,
     flag,
     tags, // ++ the idempotency tag from shopifyClient.ts ++
   } = args;
@@ -249,7 +251,9 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       address2: streetAddress2,
       country: "United States",
       zip: postCode,
-      city: getCity(flag), // ++ was hardcoded "West Hollywood." ++
+      city: mailingCity || getCity(flag), // ++ SPEC 4b: TRUE USPS city from the DB
+      //    ("Van Nuys", "San Pedro", ...). Forcing "Los Angeles" misaddresses
+      //    the Valley/Harbor. Flag city is only the fallback for legacy docs. ++
       province: "California",
       country_code: "US",
       province_code: "CA",
