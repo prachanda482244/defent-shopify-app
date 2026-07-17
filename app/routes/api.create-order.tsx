@@ -37,8 +37,8 @@ import {
  *     retried on a schedule and is therefore the one that duplicates.
  * ------------------------------------------------------------------ */
 
-// const SHOP = "defent.myshopify.com";
-const SHOP = "prachanda-test.myshopify.com";
+const SHOP = "defent.myshopify.com";
+// const SHOP = "prachanda-test.myshopify.com";
 const API_VERSION = "2025-10";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
