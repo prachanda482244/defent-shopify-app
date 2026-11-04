@@ -199,6 +199,8 @@ export interface ShopifyOrderInput {
   household_language?: string;
   identifyAsLGBTQ?: string;
   wehoHearAboutUs?: string;
+  subscription?: string; // "one_time" | "monthly" | "quarterly" | "recurring"
+  isRenewal?: boolean;
 }
 
 /** The stable idempotency tag for one (order, cycle). */

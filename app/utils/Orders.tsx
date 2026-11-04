@@ -66,17 +66,41 @@ type CreateOrderRestArgs = {
   flag?: "defentWeho" | "defentLA";
   /** ++ NOW ACTUALLY USED ++ idempotency tag, e.g. "dbid:<id>;cycle:<c>" */
   tags?: string;
+  /** Plan from WordPress/DB: "one_time" | "monthly" | "quarterly" | "recurring" */
+  subscription?: string;
+  /** true when the renewal cron sent this (a repeat order, not the first one) */
+  isRenewal?: boolean;
 };
 
-function getOrderNote(flag?: "defentWeho" | "defentLA") {
-  switch (flag) {
-    case "defentWeho":
-      return "Defent Weho";
-    case "defentLA":
-      return "Defent LA";
+/* Plan label for tags and the note, using the real stored value.
+   Unknown/empty values get no label rather than a guessed one. */
+function getPlanLabel(subscription?: string): { tag: string; text: string } | null {
+  switch (String(subscription || "").trim().toLowerCase()) {
+    case "one_time":
+    case "one-time":
+    case "onetime":
+      return { tag: "ONE-TIME", text: "One-time" };
+    case "monthly":
+      return { tag: "MONTHLY", text: "Monthly" };
+    case "quarterly":
+      return { tag: "QUARTERLY", text: "Quarterly" };
+    case "recurring":
+      return { tag: "RECURRING", text: "Recurring" };
     default:
-      return "";
+      return null;
   }
+}
+
+/* e.g. "Defent Weho · Monthly · Renewal" */
+function getOrderNote(
+  flag?: "defentWeho" | "defentLA",
+  subscription?: string,
+  isRenewal?: boolean,
+) {
+  const site =
+    flag === "defentWeho" ? "Defent Weho" : flag === "defentLA" ? "Defent LA" : "";
+  const plan = getPlanLabel(subscription)?.text;
+  return [site, plan, isRenewal ? "Renewal" : ""].filter(Boolean).join(" · ");
 }
 
 function getOrderTag(flag?: "defentWeho" | "defentLA"): string {
@@ -105,10 +129,22 @@ function getCity(flag?: "defentWeho" | "defentLA"): string {
  *     "WEHO, dbid:68f..., cycle:2026-07-01"
  * Now `tag:'dbid:68f...'` is an exact, indexable match in GraphQL.
  */
-function buildTags(flag: CreateOrderRestArgs["flag"], extra?: string): string {
+function buildTags(
+  flag: CreateOrderRestArgs["flag"],
+  extra?: string,
+  subscription?: string,
+  isRenewal?: boolean,
+): string {
   const parts: string[] = [];
   const site = getOrderTag(flag);
   if (site) parts.push(site);
+
+  // Plan tags: ONE-TIME / MONTHLY / QUARTERLY / RECURRING, plus RENEWAL on
+  // repeat orders. None start with "dbid:" or "cycle:", so the duplicate
+  // check in shopifyClient.ts is unaffected.
+  const plan = getPlanLabel(subscription);
+  if (plan) parts.push(plan.tag);
+  if (isRenewal) parts.push("RENEWAL");
 
   if (extra) {
     for (const raw of extra.split(";")) {
@@ -204,6 +240,8 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
     mailingCity,
     flag,
     tags, // ++ the idempotency tag from shopifyClient.ts ++
+    subscription,
+    isRenewal,
   } = args;
 
   if (!shop || !accessToken) throw new Error("shop and accessToken required");
@@ -259,12 +297,12 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       province_code: "CA",
     };
 
-    const orderTags = buildTags(flag, tags); // ++ THE FIX ++
+    const orderTags = buildTags(flag, tags, subscription, isRenewal);
     const metafields = buildMetafields(args);
 
     const orderBody: Record<string, unknown> = {
       email,
-      note: getOrderNote(flag),
+      note: getOrderNote(flag, subscription, isRenewal),
       tags: orderTags,
       line_items: [{ variant_id: variantId, quantity: 1 }],
       shipping_address: addr,

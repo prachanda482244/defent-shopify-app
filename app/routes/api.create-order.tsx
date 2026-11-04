@@ -171,6 +171,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     postCode,
     email,
     productId,
+    subscription,
     flag,
     age,
     gender,
@@ -191,6 +192,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     cycle: cyc,
     ...fromPayload,
     ...(fromDb(dbOrder) || {}),
+    // Plan for the ONE-TIME / MONTHLY / QUARTERLY tag: DB first, then request.
+    subscription: dbOrder?.subscription || subscription,
+    // A cycle only exists on renewals, so retries of a renewal count too.
+    isRenewal: Boolean(cyc) || isRenewal === true || isRenewal === "true",
   });
 
   /* ++ heal check: has Shopify ALREADY got this exact (order, cycle)? ++ */
@@ -284,6 +289,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       wehoHearAboutUs,
       flag,
       isRenewal,
+    },
+    {
+      /* Every request reaches the backend from this server's single IP, so
+         its per-IP limit (~20 / 10 min) would throttle the whole site and
+         delay renewals. The internal key lets our own calls through.
+         Bot protection for public sign-ups must come from the captcha. */
+      headers: { "x-internal-key": INTERNAL_API_KEY || "" },
     });
 
     // Node rejected (validation / dedup / not-due / already-claimed): stop, no Shopify.
