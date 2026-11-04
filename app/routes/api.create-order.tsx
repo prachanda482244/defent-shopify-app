@@ -1,6 +1,7 @@
 import { ActionFunctionArgs } from "@remix-run/node";
 import axios from "axios";
-import { accessToken, INTERNAL_API_KEY } from "app/constant";
+import { INTERNAL_API_KEY } from "app/constant";
+import { getShopToken } from "app/utils/shopToken.server";
 import {
   createShopifyOrder,
   findShopifyOrderByTag,
@@ -37,8 +38,11 @@ import {
  *     retried on a schedule and is therefore the one that duplicates.
  * ------------------------------------------------------------------ */
 
-const SHOP = "defent.myshopify.com";
-// const SHOP = "prachanda-test.myshopify.com";
+/* The store orders are sent to. Both Render services run this same code,
+   so each sets its own TARGET_SHOP:
+     defent service -> defent.myshopify.com (default)
+     DDI service    -> tfufrd-zd.myshopify.com (the defensediagnostics store) */
+const SHOP = process.env.TARGET_SHOP || "defent.myshopify.com";
 const API_VERSION = "2025-10";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -71,8 +75,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { success: false, message: "Invalid request payload" };
   }
 
-  if (!SHOP || !accessToken) {
-    return { success: false, message: "Shop or access token missing" };
+  const accessToken = await getShopToken(SHOP);
+  if (!accessToken) {
+    await sendErrorLog({
+      source: "shopify-app",
+      module: "order-action",
+      stage: "access_token",
+      level: "error",
+      message: `No access token for ${SHOP}. Open the app in that store's Shopify admin to reconnect.`,
+    });
+    return {
+      success: false,
+      message: `No access token for ${SHOP}. Open the app in that store's Shopify admin to reconnect.`,
+    };
   }
 
   const {

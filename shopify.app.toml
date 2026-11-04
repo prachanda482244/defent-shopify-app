@@ -1,5 +1,8 @@
    # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
+# Defent Custom App -> defent store, runs on Render service "defent-shopify-app-1".
+# The DDI app has its own file: shopify.app.ddi.toml
+
 client_id = "3b25a5dad14fc8d8919c05f55c2df6f3"
 name = "Defent Custom App"
 handle = "defent-custom-app"

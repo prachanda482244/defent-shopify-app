@@ -1,0 +1,38 @@
+# DDI Custom App -> defensediagnostics store, runs on Render service "ddi-shopify-app".
+# Deploy with: npm run deploy -- --config ddi
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "df9110b7614a935e763101fea3f1e4f2"
+name = "DDI Custom App"
+handle = "defent-app"
+application_url = "https://defent-shopify-app.onrender.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "prachanda-test.myshopify.com"
+
+[webhooks]
+api_version = "2025-04"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products,read_orders,write_orders,write_customers,read_customers"
+
+[auth]
+redirect_urls = [
+  "https://defent-shopify-app.onrender.com/auth/callback",
+  "https://defent-shopify-app.onrender.com/auth/shopify/callback",
+  "https://defent-shopify-app.onrender.com/api/auth/callback"
+]
+
+[pos]
+embedded = false
