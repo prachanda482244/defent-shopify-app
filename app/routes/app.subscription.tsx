@@ -104,8 +104,19 @@ const fmt = new Intl.DateTimeFormat(undefined, {
    lands on a 1st. Display-only; backend cycle.js is the source of truth. */
 const RECURRING = ["monthly", "quarterly", "recurring"];
 const isRecurring = (s?: string) => RECURRING.includes(String(s || ""));
-const subLabel = (s?: string) =>
-  isRecurring(s) ? "Quarterly" : s === "one_time" ? "One-time" : s || "—";
+/* Show the plan exactly as stored in the DB (display only). */
+const SUB_LABELS: Record<string, string> = {
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  recurring: "Recurring",
+  one_time: "One-time",
+};
+/* LA ("Defent La") recurring plans always show as Quarterly. */
+const isLA = (source?: string) => /\bla\b/i.test(String(source || ""));
+const subLabel = (s?: string, source?: string) =>
+  isRecurring(s) && isLA(source)
+    ? "Quarterly"
+    : SUB_LABELS[String(s || "")] || s || "—";
 
 function nextShipment(last?: string | null): Date | null {
   if (!last) return null;
@@ -381,7 +392,7 @@ const Subscription = () => {
                       isRecurring(item.subscription) ? "success" : "attention"
                     }
                   >
-                    {subLabel(item.subscription)}
+                    {subLabel(item.subscription, item.source)}
                   </Badge>
                 </IndexTable.Cell>
 
@@ -540,7 +551,7 @@ const Subscription = () => {
                             : "attention"
                         }
                       >
-                        {subLabel(target.subscription)}
+                        {subLabel(target.subscription, target.source)}
                       </Badge>
                       <Badge
                         tone={
