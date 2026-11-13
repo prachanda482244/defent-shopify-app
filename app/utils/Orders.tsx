@@ -114,6 +114,13 @@ function getOrderTag(flag?: "defentWeho" | "defentLA"): string {
   }
 }
 
+/** Units per order. Each order now takes 5 units out of inventory (client
+ *  request; it used to be 1). Change it with ORDER_QUANTITY on the service. */
+function getOrderQuantity(): number {
+  const n = parseInt(process.env.ORDER_QUANTITY || "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 5;
+}
+
 /** City must follow the flag, not be hardcoded to WeHo. */
 function getCity(flag?: "defentWeho" | "defentLA"): string {
   return flag === "defentLA" ? "Los Angeles" : "West Hollywood";
@@ -304,7 +311,7 @@ export async function CreateOrderREST(args: CreateOrderRestArgs) {
       email,
       note: getOrderNote(flag, subscription, isRenewal),
       tags: orderTags,
-      line_items: [{ variant_id: variantId, quantity: 1 }],
+      line_items: [{ variant_id: variantId, quantity: getOrderQuantity() }],
       shipping_address: addr,
       billing_address: addr,
       customer: { first_name: firstName, last_name: lastName, email },
